@@ -1,0 +1,3153 @@
+{
+  "run_id": "local-2026-11-23",
+  "timestamp": "2026-11-24T00:24:23Z",
+  "commit_sha": "44f1ba28e99701d948d6a9117d5a1a4599e2d3f7",
+  "source": "local-session",
+  "measurement_source": "claude: dev/scripts/token_usage_report.sh over local transcripts (message.usage, deduped on message.id); codex: codex_review.sh run log reviews-<date>.log (turn.completed usage)",
+  "notes": "Dates are UTC (a row is dated by its first record). Covers transcripts on THIS machine only; GHA runs are in dev/budget/<date>-<run>.json. No dollar figure: transcripts carry no price. Codex input_tokens include cached_input_tokens.",
+  "totals": {
+    "input_tokens": 14828,
+    "output_tokens": 5216530,
+    "cache_read_input_tokens": 1121007470,
+    "cache_creation_input_tokens": 21523428,
+    "total_cost_usd": null,
+    "codex_input_tokens": null,
+    "codex_output_tokens": null,
+    "measurement": "measured from local transcripts + codex run log; cost not measured"
+  },
+  "claude": {
+    "date": "2026-11-23",
+    "source": "local-transcripts",
+    "generated_at": "2026-11-24T00:24:23Z",
+    "projects_dir": "/Users/difan/.claude/projects",
+    "window": {
+      "since": "2026-11-23",
+      "until": "2026-11-23"
+    },
+    "totals": {
+      "dispatches": 110,
+      "sessions": 2,
+      "resumes": 46,
+      "api_calls": 7042,
+      "input_tokens": 14828,
+      "output_tokens": 5216530,
+      "cache_read_input_tokens": 1121007470,
+      "cache_creation_input_tokens": 21523428,
+      "subagent_tokens": 881445986,
+      "main_tokens": 266316270,
+      "by_model": {
+        "<synthetic>": {
+          "api_calls": 1,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        },
+        "claude-fable-5-2": {
+          "api_calls": 6,
+          "input_tokens": 12,
+          "output_tokens": 6262,
+          "cache_read_input_tokens": 487623,
+          "cache_creation_input_tokens": 115213
+        },
+        "claude-haiku-5-5": {
+          "api_calls": 13,
+          "input_tokens": 26,
+          "output_tokens": 15966,
+          "cache_read_input_tokens": 326525,
+          "cache_creation_input_tokens": 99609
+        },
+        "claude-opus-5-5": {
+          "api_calls": 6676,
+          "input_tokens": 14082,
+          "output_tokens": 4978076,
+          "cache_read_input_tokens": 1082538950,
+          "cache_creation_input_tokens": 18525925
+        },
+        "claude-sonnet-5-5": {
+          "api_calls": 346,
+          "input_tokens": 708,
+          "output_tokens": 216226,
+          "cache_read_input_tokens": 37654372,
+          "cache_creation_input_tokens": 2782681
+        }
+      }
+    },
+    "context_histogram": {
+      "calls": 1330,
+      "p50": 188621,
+      "p90": 317728,
+      "max": 367000,
+      "compact_threshold": 250000,
+      "calls_above_threshold": 350,
+      "share_above_threshold_pct": 26.3,
+      "buckets": [
+        {
+          "label": "0-50k",
+          "calls": 0,
+          "share_pct": 0
+        },
+        {
+          "label": "50-100k",
+          "calls": 92,
+          "share_pct": 6.9
+        },
+        {
+          "label": "100-150k",
+          "calls": 314,
+          "share_pct": 23.6
+        },
+        {
+          "label": "150-200k",
+          "calls": 349,
+          "share_pct": 26.2
+        },
+        {
+          "label": "200-300k",
+          "calls": 399,
+          "share_pct": 30
+        },
+        {
+          "label": "300-500k",
+          "calls": 176,
+          "share_pct": 13.2
+        },
+        {
+          "label": "500k+",
+          "calls": 0,
+          "share_pct": 0
+        }
+      ]
+    },
+    "rows": [
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a5cc916ac57ad6e71",
+        "agent_type": "general-purpose",
+        "description": "mg-02 checkpoint with capture on mGBA",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 3924,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 367,
+            "input_tokens": 740,
+            "output_tokens": 213173,
+            "cache_read_input_tokens": 75174075,
+            "cache_creation_input_tokens": 605675
+          }
+        },
+        "api_calls": 367,
+        "input_tokens": 740,
+        "output_tokens": 213173,
+        "cache_read_input_tokens": 75174075,
+        "cache_creation_input_tokens": 605675
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a2f7f40ba5508abd3",
+        "agent_type": "general-purpose",
+        "description": "mg-01 Celadon checkpoint on mGBA",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 5615,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 237,
+            "input_tokens": 480,
+            "output_tokens": 122123,
+            "cache_read_input_tokens": 54765637,
+            "cache_creation_input_tokens": 662643
+          }
+        },
+        "api_calls": 237,
+        "input_tokens": 480,
+        "output_tokens": 122123,
+        "cache_read_input_tokens": 54765637,
+        "cache_creation_input_tokens": 662643
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a60cfd75854ed3b1d",
+        "agent_type": "general-purpose",
+        "description": "Fix menu cursor and summary reads on mGBA",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 2711,
+        "resumes": 3,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "<synthetic>": {
+            "api_calls": 1,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 0
+          },
+          "claude-opus-5-5": {
+            "api_calls": 193,
+            "input_tokens": 394,
+            "output_tokens": 100361,
+            "cache_read_input_tokens": 37643112,
+            "cache_creation_input_tokens": 769782
+          }
+        },
+        "api_calls": 194,
+        "input_tokens": 394,
+        "output_tokens": 100361,
+        "cache_read_input_tokens": 37643112,
+        "cache_creation_input_tokens": 769782
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a464820e55ab2a376",
+        "agent_type": "results-analyst",
+        "description": "NAV-scale K=5 results read",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 2475,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 137,
+            "input_tokens": 276,
+            "output_tokens": 254386,
+            "cache_read_input_tokens": 31061873,
+            "cache_creation_input_tokens": 615557
+          }
+        },
+        "api_calls": 137,
+        "input_tokens": 276,
+        "output_tokens": 254386,
+        "cache_read_input_tokens": 31061873,
+        "cache_creation_input_tokens": 615557
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ac2da5b94e76299fa",
+        "agent_type": "general-purpose",
+        "description": "mg-02: paced encounters, then pass",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 2322,
+        "resumes": 0,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 181,
+            "input_tokens": 364,
+            "output_tokens": 49334,
+            "cache_read_input_tokens": 29330069,
+            "cache_creation_input_tokens": 192692
+          }
+        },
+        "api_calls": 181,
+        "input_tokens": 364,
+        "output_tokens": 49334,
+        "cache_read_input_tokens": 29330069,
+        "cache_creation_input_tokens": 192692
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a87580796a2db67dc",
+        "agent_type": "general-purpose",
+        "description": "Readers for mg-05/06: berry, held item, counts, mail",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1124,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 142,
+            "input_tokens": 284,
+            "output_tokens": 96659,
+            "cache_read_input_tokens": 27407380,
+            "cache_creation_input_tokens": 272400
+          }
+        },
+        "api_calls": 142,
+        "input_tokens": 284,
+        "output_tokens": 96659,
+        "cache_read_input_tokens": 27407380,
+        "cache_creation_input_tokens": 272400
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a5a3ef1d37bd81069",
+        "agent_type": "general-purpose",
+        "description": "End-state checks: party, bag, coins, money",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1419,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 137,
+            "input_tokens": 280,
+            "output_tokens": 84057,
+            "cache_read_input_tokens": 23448050,
+            "cache_creation_input_tokens": 250973
+          }
+        },
+        "api_calls": 137,
+        "input_tokens": 280,
+        "output_tokens": 84057,
+        "cache_read_input_tokens": 23448050,
+        "cache_creation_input_tokens": 250973
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a22a25737200eb8bf",
+        "agent_type": "general-purpose",
+        "description": "Fix wild flee ending early on mGBA",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1835,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 130,
+            "input_tokens": 266,
+            "output_tokens": 77312,
+            "cache_read_input_tokens": 22911940,
+            "cache_creation_input_tokens": 242705
+          }
+        },
+        "api_calls": 130,
+        "input_tokens": 266,
+        "output_tokens": 77312,
+        "cache_read_input_tokens": 22911940,
+        "cache_creation_input_tokens": 242705
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "aed4c1fa4a51020f6",
+        "agent_type": "general-purpose",
+        "description": "Build mg-06: read mail + duplicate",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1884,
+        "resumes": 0,
+        "outcome": "stalled",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 131,
+            "input_tokens": 264,
+            "output_tokens": 74523,
+            "cache_read_input_tokens": 22797369,
+            "cache_creation_input_tokens": 229622
+          }
+        },
+        "api_calls": 131,
+        "input_tokens": 264,
+        "output_tokens": 74523,
+        "cache_read_input_tokens": 22797369,
+        "cache_creation_input_tokens": 229622
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "aec2dce2a54c0398f",
+        "agent_type": "feat-weinstein",
+        "description": "feat-weinstein #3681 ADV gate",
+        "ref": "#3681",
+        "date": "2026-11-23",
+        "wall_seconds": 16080,
+        "resumes": 5,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 123,
+            "input_tokens": 262,
+            "output_tokens": 60009,
+            "cache_read_input_tokens": 21655123,
+            "cache_creation_input_tokens": 881184
+          }
+        },
+        "api_calls": 123,
+        "input_tokens": 262,
+        "output_tokens": 60009,
+        "cache_read_input_tokens": 21655123,
+        "cache_creation_input_tokens": 881184
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a934267fcfd04b038",
+        "agent_type": "general-purpose",
+        "description": "Diagnose mg-04 walk drift on mGBA",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 26399,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/33",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 134,
+            "input_tokens": 270,
+            "output_tokens": 83947,
+            "cache_read_input_tokens": 21961565,
+            "cache_creation_input_tokens": 335319
+          }
+        },
+        "api_calls": 134,
+        "input_tokens": 270,
+        "output_tokens": 83947,
+        "cache_read_input_tokens": 21961565,
+        "cache_creation_input_tokens": 335319
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "aa71d49e915d28c44",
+        "agent_type": "general-purpose",
+        "description": "Switch backend, console-free parts",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1043,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 112,
+            "input_tokens": 224,
+            "output_tokens": 104293,
+            "cache_read_input_tokens": 20685288,
+            "cache_creation_input_tokens": 253903
+          }
+        },
+        "api_calls": 112,
+        "input_tokens": 224,
+        "output_tokens": 104293,
+        "cache_read_input_tokens": 20685288,
+        "cache_creation_input_tokens": 253903
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a44a40e8fac395e8a",
+        "agent_type": "general-purpose",
+        "description": "Build FRLG grind action for mg-04",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1038,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 110,
+            "input_tokens": 222,
+            "output_tokens": 88996,
+            "cache_read_input_tokens": 19283403,
+            "cache_creation_input_tokens": 227890
+          }
+        },
+        "api_calls": 110,
+        "input_tokens": 222,
+        "output_tokens": 88996,
+        "cache_read_input_tokens": 19283403,
+        "cache_creation_input_tokens": 227890
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ad2e2e5b75cfb1d4b",
+        "agent_type": "general-purpose",
+        "description": "FRLG overworld adapter: route, settle, talk, fly",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 855,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 96,
+            "input_tokens": 194,
+            "output_tokens": 87757,
+            "cache_read_input_tokens": 17253836,
+            "cache_creation_input_tokens": 242993
+          }
+        },
+        "api_calls": 96,
+        "input_tokens": 194,
+        "output_tokens": 87757,
+        "cache_read_input_tokens": 17253836,
+        "cache_creation_input_tokens": 242993
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "acfb036fbf13baf2d",
+        "agent_type": "general-purpose",
+        "description": "FRLG battle prompt readers",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 5867,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 93,
+            "input_tokens": 188,
+            "output_tokens": 68065,
+            "cache_read_input_tokens": 16136759,
+            "cache_creation_input_tokens": 503095
+          }
+        },
+        "api_calls": 93,
+        "input_tokens": 188,
+        "output_tokens": 68065,
+        "cache_read_input_tokens": 16136759,
+        "cache_creation_input_tokens": 503095
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ad585c2754262364a",
+        "agent_type": "general-purpose",
+        "description": "FRLG shared actions + checkpoint CLI",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 894,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 92,
+            "input_tokens": 184,
+            "output_tokens": 95929,
+            "cache_read_input_tokens": 15373781,
+            "cache_creation_input_tokens": 227810
+          }
+        },
+        "api_calls": 92,
+        "input_tokens": 184,
+        "output_tokens": 95929,
+        "cache_read_input_tokens": 15373781,
+        "cache_creation_input_tokens": 227810
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a381d4f690d21e500",
+        "agent_type": "general-purpose",
+        "description": "Text reader v2: mask matching, unsubscribe",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 856,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/30",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 96,
+            "input_tokens": 192,
+            "output_tokens": 72554,
+            "cache_read_input_tokens": 15099209,
+            "cache_creation_input_tokens": 207340
+          }
+        },
+        "api_calls": 96,
+        "input_tokens": 192,
+        "output_tokens": 72554,
+        "cache_read_input_tokens": 15099209,
+        "cache_creation_input_tokens": 207340
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "a4875716227bc21e1",
+        "agent_type": "general-purpose",
+        "description": "W2 slice 3: recovery + clock",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1224,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 83,
+            "input_tokens": 166,
+            "output_tokens": 115757,
+            "cache_read_input_tokens": 14516679,
+            "cache_creation_input_tokens": 237720
+          }
+        },
+        "api_calls": 83,
+        "input_tokens": 166,
+        "output_tokens": 115757,
+        "cache_read_input_tokens": 14516679,
+        "cache_creation_input_tokens": 237720
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a673649555f1c02e6",
+        "agent_type": "general-purpose",
+        "description": "FRLG menu readers (non-text)",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 864,
+        "resumes": 6,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 85,
+            "input_tokens": 182,
+            "output_tokens": 77786,
+            "cache_read_input_tokens": 14232720,
+            "cache_creation_input_tokens": 238043
+          }
+        },
+        "api_calls": 85,
+        "input_tokens": 182,
+        "output_tokens": 77786,
+        "cache_read_input_tokens": 14232720,
+        "cache_creation_input_tokens": 238043
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a0295d600f5f01471",
+        "agent_type": "general-purpose",
+        "description": "Port navigation map model to OCaml",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 932,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 75,
+            "input_tokens": 152,
+            "output_tokens": 88923,
+            "cache_read_input_tokens": 13831199,
+            "cache_creation_input_tokens": 233067
+          }
+        },
+        "api_calls": 75,
+        "input_tokens": 152,
+        "output_tokens": 88923,
+        "cache_read_input_tokens": 13831199,
+        "cache_creation_input_tokens": 233067
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a7f994662488085c7",
+        "agent_type": "general-purpose",
+        "description": "FRLG readers: dialog and battle facts",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 709,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/22",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 90,
+            "input_tokens": 180,
+            "output_tokens": 65953,
+            "cache_read_input_tokens": 13706575,
+            "cache_creation_input_tokens": 205841
+          }
+        },
+        "api_calls": 90,
+        "input_tokens": 180,
+        "output_tokens": 65953,
+        "cache_read_input_tokens": 13706575,
+        "cache_creation_input_tokens": 205841
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "aa33c7fa6a5f80e9c",
+        "agent_type": "feat-weinstein",
+        "description": "feat-weinstein #3693 live picks unlock",
+        "ref": "#3693",
+        "date": "2026-11-23",
+        "wall_seconds": 4017,
+        "resumes": 3,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 82,
+            "input_tokens": 172,
+            "output_tokens": 54464,
+            "cache_read_input_tokens": 12947235,
+            "cache_creation_input_tokens": 360170
+          }
+        },
+        "api_calls": 82,
+        "input_tokens": 172,
+        "output_tokens": 54464,
+        "cache_read_input_tokens": 12947235,
+        "cache_creation_input_tokens": 360170
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a05ae02cb4e9c30fd",
+        "agent_type": "ops-data",
+        "description": "Fetch OTC set, rebuild PIT lists",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 4998,
+        "resumes": 8,
+        "outcome": "done",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 95,
+            "input_tokens": 204,
+            "output_tokens": 44045,
+            "cache_read_input_tokens": 11754457,
+            "cache_creation_input_tokens": 801948
+          }
+        },
+        "api_calls": 95,
+        "input_tokens": 204,
+        "output_tokens": 44045,
+        "cache_read_input_tokens": 11754457,
+        "cache_creation_input_tokens": 801948
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a4944719da384c034",
+        "agent_type": "general-purpose",
+        "description": "Contract v1.2: viewport, color_count",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 578,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/24",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 82,
+            "input_tokens": 164,
+            "output_tokens": 59535,
+            "cache_read_input_tokens": 12187722,
+            "cache_creation_input_tokens": 206338
+          }
+        },
+        "api_calls": 82,
+        "input_tokens": 164,
+        "output_tokens": 59535,
+        "cache_read_input_tokens": 12187722,
+        "cache_creation_input_tokens": 206338
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "adab95dfa65424bf7",
+        "agent_type": "general-purpose",
+        "description": "Port C++ AutoStory dev loop to GamePilot",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1108,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 87,
+            "input_tokens": 178,
+            "output_tokens": 68787,
+            "cache_read_input_tokens": 11600187,
+            "cache_creation_input_tokens": 174249
+          }
+        },
+        "api_calls": 87,
+        "input_tokens": 178,
+        "output_tokens": 68787,
+        "cache_read_input_tokens": 11600187,
+        "cache_creation_input_tokens": 174249
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a175ca4b1a1f0dad5",
+        "agent_type": "general-purpose",
+        "description": "Diagnose Victory Road walk offline",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 732,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 90,
+            "input_tokens": 180,
+            "output_tokens": 63394,
+            "cache_read_input_tokens": 11258424,
+            "cache_creation_input_tokens": 180413
+          }
+        },
+        "api_calls": 90,
+        "input_tokens": 180,
+        "output_tokens": 63394,
+        "cache_read_input_tokens": 11258424,
+        "cache_creation_input_tokens": 180413
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ab6be4b6ea959faac",
+        "agent_type": "general-purpose",
+        "description": "Port tested mg-05 (Route 16, Leppa)",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 603,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 71,
+            "input_tokens": 142,
+            "output_tokens": 57907,
+            "cache_read_input_tokens": 10606993,
+            "cache_creation_input_tokens": 208889
+          }
+        },
+        "api_calls": 71,
+        "input_tokens": 142,
+        "output_tokens": 57907,
+        "cache_read_input_tokens": 10606993,
+        "cache_creation_input_tokens": 208889
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ad51ee29c01aff291",
+        "agent_type": "feat-backtest",
+        "description": "feat-backtest #3696 initial_cash",
+        "ref": "#3696",
+        "date": "2026-11-23",
+        "wall_seconds": 4742,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 75,
+            "input_tokens": 156,
+            "output_tokens": 38464,
+            "cache_read_input_tokens": 10333330,
+            "cache_creation_input_tokens": 492773
+          }
+        },
+        "api_calls": 75,
+        "input_tokens": 156,
+        "output_tokens": 38464,
+        "cache_read_input_tokens": 10333330,
+        "cache_creation_input_tokens": 492773
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "add5884de20465792",
+        "agent_type": "general-purpose",
+        "description": "W2 slice 2: solver + extraction",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 984,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 67,
+            "input_tokens": 134,
+            "output_tokens": 103998,
+            "cache_read_input_tokens": 10292914,
+            "cache_creation_input_tokens": 206815
+          }
+        },
+        "api_calls": 67,
+        "input_tokens": 134,
+        "output_tokens": 103998,
+        "cache_read_input_tokens": 10292914,
+        "cache_creation_input_tokens": 206815
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a018c164a6da87a57",
+        "agent_type": "ops-data",
+        "description": "Fetch missing names to top-4000",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1772,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 76,
+            "input_tokens": 154,
+            "output_tokens": 54538,
+            "cache_read_input_tokens": 10285108,
+            "cache_creation_input_tokens": 182600
+          }
+        },
+        "api_calls": 76,
+        "input_tokens": 154,
+        "output_tokens": 54538,
+        "cache_read_input_tokens": 10285108,
+        "cache_creation_input_tokens": 182600
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "af57a18d2b9dc28c2",
+        "agent_type": "general-purpose",
+        "description": "FRLG battle driver and scripted runner",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 667,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 69,
+            "input_tokens": 138,
+            "output_tokens": 67842,
+            "cache_read_input_tokens": 10230465,
+            "cache_creation_input_tokens": 196393
+          }
+        },
+        "api_calls": 69,
+        "input_tokens": 138,
+        "output_tokens": 67842,
+        "cache_read_input_tokens": 10230465,
+        "cache_creation_input_tokens": 196393
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ae15e11121b67a1b6",
+        "agent_type": "general-purpose",
+        "description": "FRLG text reader from font templates",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1009,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/27",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 83,
+            "input_tokens": 166,
+            "output_tokens": 74368,
+            "cache_read_input_tokens": 9893758,
+            "cache_creation_input_tokens": 165204
+          }
+        },
+        "api_calls": 83,
+        "input_tokens": 166,
+        "output_tokens": 74368,
+        "cache_read_input_tokens": 9893758,
+        "cache_creation_input_tokens": 165204
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a2cd18a36e9c96dc1",
+        "agent_type": "qc-results",
+        "description": "qc-results on PR #3704 (retry)",
+        "ref": "#3704",
+        "date": "2026-11-23",
+        "wall_seconds": 551,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 66,
+            "input_tokens": 132,
+            "output_tokens": 55846,
+            "cache_read_input_tokens": 9844117,
+            "cache_creation_input_tokens": 191774
+          }
+        },
+        "api_calls": 66,
+        "input_tokens": 132,
+        "output_tokens": 55846,
+        "cache_read_input_tokens": 9844117,
+        "cache_creation_input_tokens": 191774
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "a344cbc616b2d4c66",
+        "agent_type": "autostory-code",
+        "description": "W1: C++ blink sample logging",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 491,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 66,
+            "input_tokens": 132,
+            "output_tokens": 45151,
+            "cache_read_input_tokens": 7911910,
+            "cache_creation_input_tokens": 151128
+          }
+        },
+        "api_calls": 66,
+        "input_tokens": 132,
+        "output_tokens": 45151,
+        "cache_read_input_tokens": 7911910,
+        "cache_creation_input_tokens": 151128
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a9cb92a17292fda3f",
+        "agent_type": "qc-results",
+        "description": "qc-results #3704 after rework",
+        "ref": "#3704",
+        "date": "2026-11-23",
+        "wall_seconds": 768,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 54,
+            "input_tokens": 108,
+            "output_tokens": 78469,
+            "cache_read_input_tokens": 7772711,
+            "cache_creation_input_tokens": 189904
+          }
+        },
+        "api_calls": 54,
+        "input_tokens": 108,
+        "output_tokens": 78469,
+        "cache_read_input_tokens": 7772711,
+        "cache_creation_input_tokens": 189904
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a9076af26bf175e71",
+        "agent_type": "general-purpose",
+        "description": "PoC daemon: mGBA backend + probes + RPC",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1106,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 63,
+            "input_tokens": 132,
+            "output_tokens": 64708,
+            "cache_read_input_tokens": 7568397,
+            "cache_creation_input_tokens": 141212
+          }
+        },
+        "api_calls": 63,
+        "input_tokens": 132,
+        "output_tokens": 64708,
+        "cache_read_input_tokens": 7568397,
+        "cache_creation_input_tokens": 141212
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "aa9dd5be9f5b5ad12",
+        "agent_type": "general-purpose",
+        "description": "Port leg planner core to OCaml",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 506,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/12",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 57,
+            "input_tokens": 114,
+            "output_tokens": 55170,
+            "cache_read_input_tokens": 7307673,
+            "cache_creation_input_tokens": 172792
+          }
+        },
+        "api_calls": 57,
+        "input_tokens": 114,
+        "output_tokens": 55170,
+        "cache_read_input_tokens": 7307673,
+        "cache_creation_input_tokens": 172792
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a0409aeb50ccfe891",
+        "agent_type": "general-purpose",
+        "description": "Subscribe only the probes each step reads",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1038,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/37",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 61,
+            "input_tokens": 124,
+            "output_tokens": 39004,
+            "cache_read_input_tokens": 7271366,
+            "cache_creation_input_tokens": 144103
+          }
+        },
+        "api_calls": 61,
+        "input_tokens": 124,
+        "output_tokens": 39004,
+        "cache_read_input_tokens": 7271366,
+        "cache_creation_input_tokens": 144103
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ae367b5a0b106d03d",
+        "agent_type": "feat-data",
+        "description": "Phase 0: universe-depth data audit",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 824,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 60,
+            "input_tokens": 120,
+            "output_tokens": 44590,
+            "cache_read_input_tokens": 7184229,
+            "cache_creation_input_tokens": 143230
+          }
+        },
+        "api_calls": 60,
+        "input_tokens": 120,
+        "output_tokens": 44590,
+        "cache_read_input_tokens": 7184229,
+        "cache_creation_input_tokens": 143230
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a2c206b5f06787c4f",
+        "agent_type": "feat-backtest",
+        "description": "feat-backtest: NAV-scale experiment setup",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 2431,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 47,
+            "input_tokens": 96,
+            "output_tokens": 48619,
+            "cache_read_input_tokens": 6911224,
+            "cache_creation_input_tokens": 365066
+          }
+        },
+        "api_calls": 47,
+        "input_tokens": 96,
+        "output_tokens": 48619,
+        "cache_read_input_tokens": 6911224,
+        "cache_creation_input_tokens": 365066
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "aaa68e069b0547e1a",
+        "agent_type": "general-purpose",
+        "description": "Port robust planner and route scorer",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 559,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/14",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 49,
+            "input_tokens": 98,
+            "output_tokens": 65409,
+            "cache_read_input_tokens": 6706713,
+            "cache_creation_input_tokens": 193722
+          }
+        },
+        "api_calls": 49,
+        "input_tokens": 98,
+        "output_tokens": 65409,
+        "cache_read_input_tokens": 6706713,
+        "cache_creation_input_tokens": 193722
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a00a70d0046764663",
+        "agent_type": "general-purpose",
+        "description": "Spec: use the FRLG mail glitch (mg-06)",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 571,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/52",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 53,
+            "input_tokens": 108,
+            "output_tokens": 51842,
+            "cache_read_input_tokens": 6706973,
+            "cache_creation_input_tokens": 170542
+          }
+        },
+        "api_calls": 53,
+        "input_tokens": 108,
+        "output_tokens": 51842,
+        "cache_read_input_tokens": 6706973,
+        "cache_creation_input_tokens": 170542
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "aba34f3f2bfaef430",
+        "agent_type": "autostory-code",
+        "description": "Fix provisional state vs window trim",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 615,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 60,
+            "input_tokens": 120,
+            "output_tokens": 60383,
+            "cache_read_input_tokens": 6668543,
+            "cache_creation_input_tokens": 138010
+          }
+        },
+        "api_calls": 60,
+        "input_tokens": 120,
+        "output_tokens": 60383,
+        "cache_read_input_tokens": 6668543,
+        "cache_creation_input_tokens": 138010
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a849e54b15a987aca",
+        "agent_type": "general-purpose",
+        "description": "Story engine: plans, events, repeat_until",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 563,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/23",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 54,
+            "input_tokens": 108,
+            "output_tokens": 61862,
+            "cache_read_input_tokens": 6197053,
+            "cache_creation_input_tokens": 152214
+          }
+        },
+        "api_calls": 54,
+        "input_tokens": 108,
+        "output_tokens": 61862,
+        "cache_read_input_tokens": 6197053,
+        "cache_creation_input_tokens": 152214
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "abe4f7f22a63f0bae",
+        "agent_type": "general-purpose",
+        "description": "Simulate mg-04 grind spot options",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 813,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 46,
+            "input_tokens": 94,
+            "output_tokens": 67380,
+            "cache_read_input_tokens": 5264047,
+            "cache_creation_input_tokens": 152125
+          }
+        },
+        "api_calls": 46,
+        "input_tokens": 94,
+        "output_tokens": 67380,
+        "cache_read_input_tokens": 5264047,
+        "cache_creation_input_tokens": 152125
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a217bab6dc928da8e",
+        "agent_type": "general-purpose",
+        "description": "Port trading linters to GamePilot",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 519,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/9",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 46,
+            "input_tokens": 92,
+            "output_tokens": 57017,
+            "cache_read_input_tokens": 5228159,
+            "cache_creation_input_tokens": 154329
+          }
+        },
+        "api_calls": 46,
+        "input_tokens": 92,
+        "output_tokens": 57017,
+        "cache_read_input_tokens": 5228159,
+        "cache_creation_input_tokens": 154329
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a79a12e1cb0cffe85",
+        "agent_type": "general-purpose",
+        "description": "Contract v1.3: changed-only probe results",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 310,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/34",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 53,
+            "input_tokens": 106,
+            "output_tokens": 26337,
+            "cache_read_input_tokens": 5189513,
+            "cache_creation_input_tokens": 108430
+          }
+        },
+        "api_calls": 53,
+        "input_tokens": 106,
+        "output_tokens": 26337,
+        "cache_read_input_tokens": 5189513,
+        "cache_creation_input_tokens": 108430
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a3339ea59b7c01901",
+        "agent_type": "general-purpose",
+        "description": "Daemon probes: template match, black screen",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 411,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/15",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 49,
+            "input_tokens": 98,
+            "output_tokens": 39803,
+            "cache_read_input_tokens": 5115796,
+            "cache_creation_input_tokens": 120061
+          }
+        },
+        "api_calls": 49,
+        "input_tokens": 98,
+        "output_tokens": 39803,
+        "cache_read_input_tokens": 5115796,
+        "cache_creation_input_tokens": 120061
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a1ba2f1084a5ddf4f",
+        "agent_type": "autostory-code",
+        "description": "Fix fork RouteScorer open-hold bug",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 332,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 47,
+            "input_tokens": 94,
+            "output_tokens": 25724,
+            "cache_read_input_tokens": 4973739,
+            "cache_creation_input_tokens": 123588
+          }
+        },
+        "api_calls": 47,
+        "input_tokens": 94,
+        "output_tokens": 25724,
+        "cache_read_input_tokens": 4973739,
+        "cache_creation_input_tokens": 123588
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a02e8646e43a69624",
+        "agent_type": "qc-results",
+        "description": "qc-results PR 3699 prereg",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 423,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 37,
+            "input_tokens": 74,
+            "output_tokens": 40375,
+            "cache_read_input_tokens": 4637735,
+            "cache_creation_input_tokens": 157664
+          }
+        },
+        "api_calls": 37,
+        "input_tokens": 74,
+        "output_tokens": 40375,
+        "cache_read_input_tokens": 4637735,
+        "cache_creation_input_tokens": 157664
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "a776fceb8ba1fecb0",
+        "agent_type": "general-purpose",
+        "description": "W2: OCaml BDSP RNG math",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 466,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 39,
+            "input_tokens": 78,
+            "output_tokens": 50375,
+            "cache_read_input_tokens": 4446722,
+            "cache_creation_input_tokens": 132811
+          }
+        },
+        "api_calls": 39,
+        "input_tokens": 78,
+        "output_tokens": 50375,
+        "cache_read_input_tokens": 4446722,
+        "cache_creation_input_tokens": 132811
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a5fa963341216c6de",
+        "agent_type": "general-purpose",
+        "description": "Port leg walker plus race effect",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 437,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/16",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 41,
+            "input_tokens": 82,
+            "output_tokens": 46148,
+            "cache_read_input_tokens": 4400604,
+            "cache_creation_input_tokens": 131004
+          }
+        },
+        "api_calls": 41,
+        "input_tokens": 82,
+        "output_tokens": 46148,
+        "cache_read_input_tokens": 4400604,
+        "cache_creation_input_tokens": 131004
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a12f7750fc0919f51",
+        "agent_type": "harness-maintainer",
+        "description": "PR: pit-v13 lists + warehouse build",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 312,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/trading/pull/3706",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 32,
+            "input_tokens": 64,
+            "output_tokens": 38937,
+            "cache_read_input_tokens": 4155663,
+            "cache_creation_input_tokens": 166871
+          }
+        },
+        "api_calls": 32,
+        "input_tokens": 64,
+        "output_tokens": 38937,
+        "cache_read_input_tokens": 4155663,
+        "cache_creation_input_tokens": 166871
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a74586f4b1b373679",
+        "agent_type": "general-purpose",
+        "description": "Contract v1.1 both sides",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 263,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/8",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 37,
+            "input_tokens": 74,
+            "output_tokens": 25621,
+            "cache_read_input_tokens": 3755416,
+            "cache_creation_input_tokens": 114124
+          }
+        },
+        "api_calls": 37,
+        "input_tokens": 74,
+        "output_tokens": 25621,
+        "cache_read_input_tokens": 3755416,
+        "cache_creation_input_tokens": 114124
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a7d563c22aa462f66",
+        "agent_type": "general-purpose",
+        "description": "Core upload effect and screen state",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 415,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 37,
+            "input_tokens": 76,
+            "output_tokens": 29975,
+            "cache_read_input_tokens": 3648192,
+            "cache_creation_input_tokens": 127709
+          }
+        },
+        "api_calls": 37,
+        "input_tokens": 76,
+        "output_tokens": 29975,
+        "cache_read_input_tokens": 3648192,
+        "cache_creation_input_tokens": 127709
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a570acbf435d0ed6c",
+        "agent_type": "pr-maintenance",
+        "description": "Merge fork main into lab/main",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 205,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 33,
+            "input_tokens": 66,
+            "output_tokens": 16346,
+            "cache_read_input_tokens": 3379125,
+            "cache_creation_input_tokens": 108590
+          }
+        },
+        "api_calls": 33,
+        "input_tokens": 66,
+        "output_tokens": 16346,
+        "cache_read_input_tokens": 3379125,
+        "cache_creation_input_tokens": 108590
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "aa625df1459cd0f5b",
+        "agent_type": "general-purpose",
+        "description": "Port leg trace and route log",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 306,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/11",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 35,
+            "input_tokens": 70,
+            "output_tokens": 35234,
+            "cache_read_input_tokens": 3349793,
+            "cache_creation_input_tokens": 109498
+          }
+        },
+        "api_calls": 35,
+        "input_tokens": 70,
+        "output_tokens": 35234,
+        "cache_read_input_tokens": 3349793,
+        "cache_creation_input_tokens": 109498
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "acb9152f721f5b07e",
+        "agent_type": "general-purpose",
+        "description": "PoC OCaml: kernel, client, replay",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 1029,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 34,
+            "input_tokens": 74,
+            "output_tokens": 47549,
+            "cache_read_input_tokens": 3174591,
+            "cache_creation_input_tokens": 221258
+          }
+        },
+        "api_calls": 34,
+        "input_tokens": 74,
+        "output_tokens": 47549,
+        "cache_read_input_tokens": 3174591,
+        "cache_creation_input_tokens": 221258
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "ab3b06040062deb87",
+        "agent_type": "autostory-code",
+        "description": "Fix German starter select press",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 275,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 35,
+            "input_tokens": 70,
+            "output_tokens": 25445,
+            "cache_read_input_tokens": 3143624,
+            "cache_creation_input_tokens": 99781
+          }
+        },
+        "api_calls": 35,
+        "input_tokens": 70,
+        "output_tokens": 25445,
+        "cache_read_input_tokens": 3143624,
+        "cache_creation_input_tokens": 99781
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a67691810e367d5ad",
+        "agent_type": "qc-results",
+        "description": "qc-results #3704 iteration 2",
+        "ref": "#3704",
+        "date": "2026-11-23",
+        "wall_seconds": 248,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 30,
+            "input_tokens": 60,
+            "output_tokens": 23497,
+            "cache_read_input_tokens": 3084902,
+            "cache_creation_input_tokens": 113729
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 60,
+        "output_tokens": 23497,
+        "cache_read_input_tokens": 3084902,
+        "cache_creation_input_tokens": 113729
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a6958f5d0959bb98d",
+        "agent_type": "harness-maintainer",
+        "description": "harness #3676 fixtures to private repo",
+        "ref": "#3676",
+        "date": "2026-11-23",
+        "wall_seconds": 318,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/trading/pull/3701",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 30,
+            "input_tokens": 60,
+            "output_tokens": 18328,
+            "cache_read_input_tokens": 2926493,
+            "cache_creation_input_tokens": 118489
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 60,
+        "output_tokens": 18328,
+        "cache_read_input_tokens": 2926493,
+        "cache_creation_input_tokens": 118489
+      },
+      {
+        "kind": "dispatch",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "agent_id": "a5f4e586434f7267e",
+        "agent_type": "pr-maintenance",
+        "description": "Consolidate RNG fixes into one PR",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 167,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 29,
+            "input_tokens": 58,
+            "output_tokens": 15843,
+            "cache_read_input_tokens": 2407094,
+            "cache_creation_input_tokens": 89491
+          }
+        },
+        "api_calls": 29,
+        "input_tokens": 58,
+        "output_tokens": 15843,
+        "cache_read_input_tokens": 2407094,
+        "cache_creation_input_tokens": 89491
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a65e13db91ec972f4",
+        "agent_type": "general-purpose",
+        "description": "Public-repo cleanup PR for GamePilot",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 214,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/53",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 30,
+            "input_tokens": 60,
+            "output_tokens": 19153,
+            "cache_read_input_tokens": 2396792,
+            "cache_creation_input_tokens": 86021
+          }
+        },
+        "api_calls": 30,
+        "input_tokens": 60,
+        "output_tokens": 19153,
+        "cache_read_input_tokens": 2396792,
+        "cache_creation_input_tokens": 86021
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ada38061d480998bb",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR #3706",
+        "ref": "#3706",
+        "date": "2026-11-23",
+        "wall_seconds": 258,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 24262,
+            "cache_read_input_tokens": 2150968,
+            "cache_creation_input_tokens": 130684
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 24262,
+        "cache_read_input_tokens": 2150968,
+        "cache_creation_input_tokens": 130684
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a94bb7647c1726905",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral on PR #3701",
+        "ref": "#3701",
+        "date": "2026-11-23",
+        "wall_seconds": 189,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 22,
+            "input_tokens": 44,
+            "output_tokens": 16848,
+            "cache_read_input_tokens": 2115190,
+            "cache_creation_input_tokens": 97994
+          }
+        },
+        "api_calls": 22,
+        "input_tokens": 44,
+        "output_tokens": 16848,
+        "cache_read_input_tokens": 2115190,
+        "cache_creation_input_tokens": 97994
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a8ef27b8962f560ad",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3697",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 158,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 20,
+            "input_tokens": 40,
+            "output_tokens": 15268,
+            "cache_read_input_tokens": 2037193,
+            "cache_creation_input_tokens": 124569
+          }
+        },
+        "api_calls": 20,
+        "input_tokens": 40,
+        "output_tokens": 15268,
+        "cache_read_input_tokens": 2037193,
+        "cache_creation_input_tokens": 124569
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a09afba450022fa8e",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3698",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 183,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 17072,
+            "cache_read_input_tokens": 1897981,
+            "cache_creation_input_tokens": 97107
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 17072,
+        "cache_read_input_tokens": 1897981,
+        "cache_creation_input_tokens": 97107
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a0894e331fcc323c9",
+        "agent_type": "general-purpose",
+        "description": "GamePilot Week 0 link spike",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 750,
+        "resumes": 1,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/1",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 28,
+            "input_tokens": 58,
+            "output_tokens": 13774,
+            "cache_read_input_tokens": 1826098,
+            "cache_creation_input_tokens": 142863
+          }
+        },
+        "api_calls": 28,
+        "input_tokens": 58,
+        "output_tokens": 13774,
+        "cache_read_input_tokens": 1826098,
+        "cache_creation_input_tokens": 142863
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a02185b9709a1fa23",
+        "agent_type": "qc-results",
+        "description": "qc-results PR 3699 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 224,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 40,
+            "output_tokens": 22025,
+            "cache_read_input_tokens": 1846551,
+            "cache_creation_input_tokens": 98929
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 40,
+        "output_tokens": 22025,
+        "cache_read_input_tokens": 1846551,
+        "cache_creation_input_tokens": 98929
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ab16a58441c6e571a",
+        "agent_type": "general-purpose",
+        "description": "Add Mail Glitch rooms to PokemonSimulation maps",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 245,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/PokemonSimulation/pull/121",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 26,
+            "input_tokens": 52,
+            "output_tokens": 12237,
+            "cache_read_input_tokens": 1853736,
+            "cache_creation_input_tokens": 72990
+          }
+        },
+        "api_calls": 26,
+        "input_tokens": 52,
+        "output_tokens": 12237,
+        "cache_read_input_tokens": 1853736,
+        "cache_creation_input_tokens": 72990
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ac328da65b629315c",
+        "agent_type": "general-purpose",
+        "description": "Split wire codec, drop lint waivers",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 222,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/19",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 22,
+            "input_tokens": 44,
+            "output_tokens": 23651,
+            "cache_read_input_tokens": 1750665,
+            "cache_creation_input_tokens": 78333
+          }
+        },
+        "api_calls": 22,
+        "input_tokens": 44,
+        "output_tokens": 23651,
+        "cache_read_input_tokens": 1750665,
+        "cache_creation_input_tokens": 78333
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a4bd24636c6f9daad",
+        "agent_type": "general-purpose",
+        "description": "Fix PokemonSimulation CI, merge #119",
+        "ref": "#119",
+        "date": "2026-11-23",
+        "wall_seconds": 1358,
+        "resumes": 2,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 26,
+            "input_tokens": 58,
+            "output_tokens": 7385,
+            "cache_read_input_tokens": 1663133,
+            "cache_creation_input_tokens": 180270
+          }
+        },
+        "api_calls": 26,
+        "input_tokens": 58,
+        "output_tokens": 7385,
+        "cache_read_input_tokens": 1663133,
+        "cache_creation_input_tokens": 180270
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a0b1dc2757813e068",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3695",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 223,
+        "resumes": 0,
+        "outcome": "NEEDS_REWORK",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 17,
+            "input_tokens": 34,
+            "output_tokens": 13067,
+            "cache_read_input_tokens": 1697146,
+            "cache_creation_input_tokens": 119943
+          }
+        },
+        "api_calls": 17,
+        "input_tokens": 34,
+        "output_tokens": 13067,
+        "cache_read_input_tokens": 1697146,
+        "cache_creation_input_tokens": 119943
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a229dedec348e6c59",
+        "agent_type": "harness-maintainer",
+        "description": "Rework #3701 iteration 1",
+        "ref": "#3701",
+        "date": "2026-11-23",
+        "wall_seconds": 104,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 10848,
+            "cache_read_input_tokens": 1706292,
+            "cache_creation_input_tokens": 85986
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 10848,
+        "cache_read_input_tokens": 1706292,
+        "cache_creation_input_tokens": 85986
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a3512da950d950584",
+        "agent_type": "general-purpose",
+        "description": "Port wall and wander recovery",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 184,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 21,
+            "input_tokens": 42,
+            "output_tokens": 19805,
+            "cache_read_input_tokens": 1637941,
+            "cache_creation_input_tokens": 79005
+          }
+        },
+        "api_calls": 21,
+        "input_tokens": 42,
+        "output_tokens": 19805,
+        "cache_read_input_tokens": 1637941,
+        "cache_creation_input_tokens": 79005
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "aeedf4d5517b1e5e8",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3706 after rework",
+        "ref": "#3706",
+        "date": "2026-11-23",
+        "wall_seconds": 162,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 14,
+            "input_tokens": 28,
+            "output_tokens": 14575,
+            "cache_read_input_tokens": 1384763,
+            "cache_creation_input_tokens": 108205
+          }
+        },
+        "api_calls": 14,
+        "input_tokens": 28,
+        "output_tokens": 14575,
+        "cache_read_input_tokens": 1384763,
+        "cache_creation_input_tokens": 108205
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a4b1d3ecabbbbc338",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3697 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 219,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 32,
+            "output_tokens": 9252,
+            "cache_read_input_tokens": 1403865,
+            "cache_creation_input_tokens": 86744
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 32,
+        "output_tokens": 9252,
+        "cache_read_input_tokens": 1403865,
+        "cache_creation_input_tokens": 86744
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a49d7d045187d6ce9",
+        "agent_type": "Explore",
+        "description": "Survey C++ AutoStory dev loop",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 127,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 22,
+            "input_tokens": 44,
+            "output_tokens": 11703,
+            "cache_read_input_tokens": 1362908,
+            "cache_creation_input_tokens": 90541
+          }
+        },
+        "api_calls": 22,
+        "input_tokens": 44,
+        "output_tokens": 11703,
+        "cache_read_input_tokens": 1362908,
+        "cache_creation_input_tokens": 90541
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "abe4b9310b861105a",
+        "agent_type": "general-purpose",
+        "description": "Commit mg-04 walk as replay test",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 131,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/38",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 22,
+            "input_tokens": 44,
+            "output_tokens": 9638,
+            "cache_read_input_tokens": 1384164,
+            "cache_creation_input_tokens": 56071
+          }
+        },
+        "api_calls": 22,
+        "input_tokens": 44,
+        "output_tokens": 9638,
+        "cache_read_input_tokens": 1384164,
+        "cache_creation_input_tokens": 56071
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "ac59b130a0498531b",
+        "agent_type": "general-purpose",
+        "description": "Daemon offline image probe tool",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 189,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/17",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 17,
+            "input_tokens": 34,
+            "output_tokens": 15598,
+            "cache_read_input_tokens": 1287464,
+            "cache_creation_input_tokens": 75410
+          }
+        },
+        "api_calls": 17,
+        "input_tokens": 34,
+        "output_tokens": 15598,
+        "cache_read_input_tokens": 1287464,
+        "cache_creation_input_tokens": 75410
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "adbea4f92159e9750",
+        "agent_type": "general-purpose",
+        "description": "Commit lab test images into GamePilot",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 135,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/GamePilot/pull/36",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 19,
+            "input_tokens": 38,
+            "output_tokens": 8530,
+            "cache_read_input_tokens": 1151087,
+            "cache_creation_input_tokens": 53890
+          }
+        },
+        "api_calls": 19,
+        "input_tokens": 38,
+        "output_tokens": 8530,
+        "cache_read_input_tokens": 1151087,
+        "cache_creation_input_tokens": 53890
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a3ada23b5c00f35c6",
+        "agent_type": "harness-maintainer",
+        "description": "Rework #3706 iteration 1",
+        "ref": "#3706",
+        "date": "2026-11-23",
+        "wall_seconds": 75,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 8634,
+            "cache_read_input_tokens": 1079131,
+            "cache_creation_input_tokens": 90429
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 8634,
+        "cache_read_input_tokens": 1079131,
+        "cache_creation_input_tokens": 90429
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a7c896fe06680b739",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3695 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 163,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 13,
+            "input_tokens": 26,
+            "output_tokens": 6417,
+            "cache_read_input_tokens": 1052304,
+            "cache_creation_input_tokens": 96536
+          }
+        },
+        "api_calls": 13,
+        "input_tokens": 26,
+        "output_tokens": 6417,
+        "cache_read_input_tokens": 1052304,
+        "cache_creation_input_tokens": 96536
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a21e836135f7008db",
+        "agent_type": "run-records",
+        "description": "Sync disk_gc section 8 to agents",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 131,
+        "resumes": 1,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 16,
+            "input_tokens": 34,
+            "output_tokens": 12721,
+            "cache_read_input_tokens": 1050742,
+            "cache_creation_input_tokens": 81716
+          }
+        },
+        "api_calls": 16,
+        "input_tokens": 34,
+        "output_tokens": 12721,
+        "cache_read_input_tokens": 1050742,
+        "cache_creation_input_tokens": 81716
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ad63f25d86fd08b70",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3698 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 82,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 11,
+            "input_tokens": 22,
+            "output_tokens": 7119,
+            "cache_read_input_tokens": 943395,
+            "cache_creation_input_tokens": 83165
+          }
+        },
+        "api_calls": 11,
+        "input_tokens": 22,
+        "output_tokens": 7119,
+        "cache_read_input_tokens": 943395,
+        "cache_creation_input_tokens": 83165
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a5e1b05d7b4e516d9",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral #3701 after rework",
+        "ref": "#3701",
+        "date": "2026-11-23",
+        "wall_seconds": 93,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 10,
+            "input_tokens": 20,
+            "output_tokens": 7950,
+            "cache_read_input_tokens": 874107,
+            "cache_creation_input_tokens": 89666
+          }
+        },
+        "api_calls": 10,
+        "input_tokens": 20,
+        "output_tokens": 7950,
+        "cache_read_input_tokens": 874107,
+        "cache_creation_input_tokens": 89666
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a234b28d23a240e26",
+        "agent_type": "general-purpose",
+        "description": "Clear session/replay lint waivers",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 96,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 12,
+            "input_tokens": 24,
+            "output_tokens": 9939,
+            "cache_read_input_tokens": 695133,
+            "cache_creation_input_tokens": 73646
+          }
+        },
+        "api_calls": 12,
+        "input_tokens": 24,
+        "output_tokens": 9939,
+        "cache_read_input_tokens": 695133,
+        "cache_creation_input_tokens": 73646
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ab53c553beab4c7a0",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3692",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 52,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 9,
+            "input_tokens": 18,
+            "output_tokens": 4795,
+            "cache_read_input_tokens": 668824,
+            "cache_creation_input_tokens": 89466
+          }
+        },
+        "api_calls": 9,
+        "input_tokens": 18,
+        "output_tokens": 4795,
+        "cache_read_input_tokens": 668824,
+        "cache_creation_input_tokens": 89466
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "af94959e6c790eadc",
+        "agent_type": "harness-maintainer",
+        "description": "Sweep PR body clamp warning",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 36,
+        "resumes": 0,
+        "outcome": "https://github.com/dayfine/trading/pull/3692",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 8,
+            "input_tokens": 16,
+            "output_tokens": 2990,
+            "cache_read_input_tokens": 559652,
+            "cache_creation_input_tokens": 84614
+          }
+        },
+        "api_calls": 8,
+        "input_tokens": 16,
+        "output_tokens": 2990,
+        "cache_read_input_tokens": 559652,
+        "cache_creation_input_tokens": 84614
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a50fd25fd6c93cc9c",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR #3701",
+        "ref": "#3701",
+        "date": "2026-11-23",
+        "wall_seconds": 57,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 7,
+            "input_tokens": 14,
+            "output_tokens": 4423,
+            "cache_read_input_tokens": 541475,
+            "cache_creation_input_tokens": 98020
+          }
+        },
+        "api_calls": 7,
+        "input_tokens": 14,
+        "output_tokens": 4423,
+        "cache_read_input_tokens": 541475,
+        "cache_creation_input_tokens": 98020
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a1824542a55bbdf02",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3706 after rework",
+        "ref": "#3706",
+        "date": "2026-11-23",
+        "wall_seconds": 36,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 7,
+            "input_tokens": 14,
+            "output_tokens": 2637,
+            "cache_read_input_tokens": 514138,
+            "cache_creation_input_tokens": 92679
+          }
+        },
+        "api_calls": 7,
+        "input_tokens": 14,
+        "output_tokens": 2637,
+        "cache_read_input_tokens": 514138,
+        "cache_creation_input_tokens": 92679
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ad23811d70357788f",
+        "agent_type": "general-purpose",
+        "description": "Fable: positioning given market now",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 64,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-fable-5-2",
+        "models": {
+          "claude-fable-5-2": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 6262,
+            "cache_read_input_tokens": 487623,
+            "cache_creation_input_tokens": 115213
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 6262,
+        "cache_read_input_tokens": 487623,
+        "cache_creation_input_tokens": 115213
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "af39101be4fe7d89f",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3656",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 51,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 7,
+            "input_tokens": 14,
+            "output_tokens": 4586,
+            "cache_read_input_tokens": 531767,
+            "cache_creation_input_tokens": 65225
+          }
+        },
+        "api_calls": 7,
+        "input_tokens": 14,
+        "output_tokens": 4586,
+        "cache_read_input_tokens": 531767,
+        "cache_creation_input_tokens": 65225
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a2b40f45c503dd73f",
+        "agent_type": "qc-results",
+        "description": "qc-results on PR #3704",
+        "ref": "#3704",
+        "date": "2026-11-23",
+        "wall_seconds": 55,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 7,
+            "input_tokens": 14,
+            "output_tokens": 4512,
+            "cache_read_input_tokens": 493797,
+            "cache_creation_input_tokens": 67278
+          }
+        },
+        "api_calls": 7,
+        "input_tokens": 14,
+        "output_tokens": 4512,
+        "cache_read_input_tokens": 493797,
+        "cache_creation_input_tokens": 67278
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a3fb8a746b65d5410",
+        "agent_type": "qc-structural",
+        "description": "qc-structural on PR #3706",
+        "ref": "#3706",
+        "date": "2026-11-23",
+        "wall_seconds": 47,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 4098,
+            "cache_read_input_tokens": 449210,
+            "cache_creation_input_tokens": 105054
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 4098,
+        "cache_read_input_tokens": 449210,
+        "cache_creation_input_tokens": 105054
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ac23f10ef38744bbc",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3695",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 37,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 3771,
+            "cache_read_input_tokens": 445643,
+            "cache_creation_input_tokens": 100972
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 3771,
+        "cache_read_input_tokens": 445643,
+        "cache_creation_input_tokens": 100972
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ad2584e7553399e88",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3698",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 29,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 2684,
+            "cache_read_input_tokens": 442672,
+            "cache_creation_input_tokens": 98026
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 2684,
+        "cache_read_input_tokens": 442672,
+        "cache_creation_input_tokens": 98026
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a1e0bc2c1fbaf2ae0",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3697 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 28,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 2672,
+            "cache_read_input_tokens": 425966,
+            "cache_creation_input_tokens": 92191
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 2672,
+        "cache_read_input_tokens": 425966,
+        "cache_creation_input_tokens": 92191
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a6cc0b87c7b0ba742",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3697",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 27,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 2534,
+            "cache_read_input_tokens": 426602,
+            "cache_creation_input_tokens": 91287
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 2534,
+        "cache_read_input_tokens": 426602,
+        "cache_creation_input_tokens": 91287
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a74ddcf3d8083576a",
+        "agent_type": "qc-behavioral",
+        "description": "qc-behavioral PR 3652",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 36,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 6,
+            "input_tokens": 12,
+            "output_tokens": 2795,
+            "cache_read_input_tokens": 422784,
+            "cache_creation_input_tokens": 67571
+          }
+        },
+        "api_calls": 6,
+        "input_tokens": 12,
+        "output_tokens": 2795,
+        "cache_read_input_tokens": 422784,
+        "cache_creation_input_tokens": 67571
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "aa87cce1c99847f09",
+        "agent_type": "pr-maintenance",
+        "description": "Merge scorer fix up seam stack",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 69,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 8,
+            "input_tokens": 16,
+            "output_tokens": 2855,
+            "cache_read_input_tokens": 435554,
+            "cache_creation_input_tokens": 46125
+          }
+        },
+        "api_calls": 8,
+        "input_tokens": 16,
+        "output_tokens": 2855,
+        "cache_read_input_tokens": 435554,
+        "cache_creation_input_tokens": 46125
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ad1669ba6f2dd86d0",
+        "agent_type": "qc-structural",
+        "description": "qc-structural #3701 after rework",
+        "ref": "#3701",
+        "date": "2026-11-23",
+        "wall_seconds": 45,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 5,
+            "input_tokens": 10,
+            "output_tokens": 2859,
+            "cache_read_input_tokens": 363751,
+            "cache_creation_input_tokens": 79738
+          }
+        },
+        "api_calls": 5,
+        "input_tokens": 10,
+        "output_tokens": 2859,
+        "cache_read_input_tokens": 363751,
+        "cache_creation_input_tokens": 79738
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "abf967c8ee0791094",
+        "agent_type": "qc-structural",
+        "description": "qc-structural re-run on #3701",
+        "ref": "#3701",
+        "date": "2026-11-23",
+        "wall_seconds": 41,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 5,
+            "input_tokens": 10,
+            "output_tokens": 2590,
+            "cache_read_input_tokens": 341723,
+            "cache_creation_input_tokens": 92547
+          }
+        },
+        "api_calls": 5,
+        "input_tokens": 10,
+        "output_tokens": 2590,
+        "cache_read_input_tokens": 341723,
+        "cache_creation_input_tokens": 92547
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ac72e49d4bbd5171e",
+        "agent_type": "Explore",
+        "description": "Find initial cash config path",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 33,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-haiku-5-5",
+        "models": {
+          "claude-haiku-5-5": {
+            "api_calls": 10,
+            "input_tokens": 20,
+            "output_tokens": 5836,
+            "cache_read_input_tokens": 290303,
+            "cache_creation_input_tokens": 44413
+          }
+        },
+        "api_calls": 10,
+        "input_tokens": 20,
+        "output_tokens": 5836,
+        "cache_read_input_tokens": 290303,
+        "cache_creation_input_tokens": 44413
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a52083af4f5e43120",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3656",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 22,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 1790,
+            "cache_read_input_tokens": 247766,
+            "cache_creation_input_tokens": 87735
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 1790,
+        "cache_read_input_tokens": 247766,
+        "cache_creation_input_tokens": 87735
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a2f056ee7c8dff000",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3698 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 26,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 2108,
+            "cache_read_input_tokens": 242450,
+            "cache_creation_input_tokens": 86910
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 2108,
+        "cache_read_input_tokens": 242450,
+        "cache_creation_input_tokens": 86910
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a6a61302286e020fc",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3695 re-review",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 23,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 1962,
+            "cache_read_input_tokens": 241609,
+            "cache_creation_input_tokens": 85988
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 1962,
+        "cache_read_input_tokens": 241609,
+        "cache_creation_input_tokens": 85988
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "a440ff2be4f1ec3af",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3692",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 21,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 2147,
+            "cache_read_input_tokens": 240683,
+            "cache_creation_input_tokens": 84406
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 2147,
+        "cache_read_input_tokens": 240683,
+        "cache_creation_input_tokens": 84406
+      },
+      {
+        "kind": "dispatch",
+        "session": "4d3e3170-bdbe-449b-b0b1-b2b366fa3e92",
+        "agent_id": "ae3c7f0d5abddff13",
+        "agent_type": "qc-structural",
+        "description": "qc-structural PR 3652",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 19,
+        "resumes": 0,
+        "outcome": "APPROVED",
+        "model": "claude-sonnet-5-5",
+        "models": {
+          "claude-sonnet-5-5": {
+            "api_calls": 4,
+            "input_tokens": 8,
+            "output_tokens": 1631,
+            "cache_read_input_tokens": 263888,
+            "cache_creation_input_tokens": 56191
+          }
+        },
+        "api_calls": 4,
+        "input_tokens": 8,
+        "output_tokens": 1631,
+        "cache_read_input_tokens": 263888,
+        "cache_creation_input_tokens": 56191
+      },
+      {
+        "kind": "dispatch",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "agent_id": "a5c1ea1aebfe7cc44",
+        "agent_type": "web-fetch",
+        "description": "Fetch pokefirered map preview code",
+        "ref": "",
+        "date": "2026-11-23",
+        "wall_seconds": 43,
+        "resumes": 0,
+        "outcome": "done",
+        "model": "claude-haiku-5-5",
+        "models": {
+          "claude-haiku-5-5": {
+            "api_calls": 3,
+            "input_tokens": 6,
+            "output_tokens": 10130,
+            "cache_read_input_tokens": 36222,
+            "cache_creation_input_tokens": 55196
+          }
+        },
+        "api_calls": 3,
+        "input_tokens": 6,
+        "output_tokens": 10130,
+        "cache_read_input_tokens": 36222,
+        "cache_creation_input_tokens": 55196
+      }
+    ],
+    "sessions": [
+      {
+        "kind": "session",
+        "session": "17e4f3a9-fdf0-436c-8e53-28db150c42dd",
+        "date": "2026-11-23",
+        "wall_seconds": 64018,
+        "dispatches_launched": 53,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 687,
+            "input_tokens": 1666,
+            "output_tokens": 436851,
+            "cache_read_input_tokens": 141591619,
+            "cache_creation_input_tokens": 1144702
+          }
+        },
+        "api_calls": 687,
+        "input_tokens": 1666,
+        "output_tokens": 436851,
+        "cache_read_input_tokens": 141591619,
+        "cache_creation_input_tokens": 1144702
+      },
+      {
+        "kind": "session",
+        "session": "487551e4-9cec-4aeb-91d3-b60eecd0a466",
+        "date": "2026-11-23",
+        "wall_seconds": 60931,
+        "dispatches_launched": 7,
+        "model": "claude-opus-5-5",
+        "models": {
+          "claude-opus-5-5": {
+            "api_calls": 643,
+            "input_tokens": 1596,
+            "output_tokens": 289315,
+            "cache_read_input_tokens": 122054648,
+            "cache_creation_input_tokens": 795873
+          }
+        },
+        "api_calls": 643,
+        "input_tokens": 1596,
+        "output_tokens": 289315,
+        "cache_read_input_tokens": 122054648,
+        "cache_creation_input_tokens": 795873
+      }
+    ]
+  },
+  "codex": {
+    "runs": 0,
+    "measured_runs": 0,
+    "rows": []
+  }
+}

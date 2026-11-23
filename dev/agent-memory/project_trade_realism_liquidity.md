@@ -51,3 +51,5 @@ weight MaxDD/time-underwater/realised-vs-unrealised over mean return. Note:
 `dev/notes/concentration-entry-cap-probe-2026-06-10.md`, plan
 `dev/plans/concentration-rebalance-2026-06-10.md`. Cascade-reweight (the other lever
 from this thread) was REJECTED [[project_cascade_selection_inversion]].
+
+**Size qualifier (11-23, nav-scale #3704):** holds for a $1M start (P-1M ≈ F-1M; F-1M p90 position 7.3 % of 20-day ADV). FAILS for a $10M start: a 10 % participation cap costs −0.74 log median, F-10M median position 13 % of ADV (33 % in 2023). Capacity limit lies between a $1M and $10M start.
