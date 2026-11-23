@@ -213,10 +213,13 @@ let test_walk_cap_below_share_blocks _ =
     at a $2M NAV, where the sizer doubles the position. *)
 let test_walk_cap_scales_with_current_nav _ =
   let cap = Some (_uncapped_share () +. _epsilon) in
-  let admitted ~cash = List.length (fst (_walk ~cash cap)) in
+  let outcome ~cash =
+    let placed, skipped = _walk ~cash cap in
+    (List.length placed, skipped)
+  in
   assert_that
-    (admitted ~cash:1_000_000.0, admitted ~cash:2_000_000.0)
-    (equal_to (1, 0))
+    (outcome ~cash:1_000_000.0, outcome ~cash:2_000_000.0)
+    (equal_to ((1, []), (0, [ Audit_recorder.Adv_participation_cap ])))
 
 (* ---- the dust floor ---------------------------------------------------- *)
 

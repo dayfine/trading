@@ -642,6 +642,70 @@ let test_armed_dense_tail_retains_candidate _ =
          field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
        ])
 
+(* ---- ADV-participation cap (issue #3681) ---- *)
+
+(* The breakout fixture generated with [max_entry_adv_participation = cap]
+   against a live account holding [cash]. *)
+let _participation_snap ~cash ~cap =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let liquidity_config =
+    { base.config.liquidity_config with max_entry_adv_participation = cap }
+  in
+  Generator.generate
+    {
+      base with
+      config = { base.config with liquidity_config };
+      live_portfolio = { base.live_portfolio with cash };
+    }
+
+(* AAPL's sized dollars at a $100k account, uncapped. *)
+let _aapl_sized_at_100k () =
+  (_participation_snap ~cash:100_000.0 ~cap:None).long_candidates
+  |> List.find_map_exn ~f:(fun (c : Weekly_snapshot.candidate) ->
+      Option.some_if (String.equal c.symbol "AAPL") c.sized_position_value)
+
+(* Pinned at the [generate] seam: the cap is set at twice the share of ADV
+   AAPL's position takes at a $100k account. The position is sized against the
+   live account ([live_portfolio.cash], the [--portfolio] input), so at $100k
+   AAPL is kept with no warning, and at $1M (a ~10x position, same stock and
+   ADV) it is dropped with a warning naming it.
+
+   Mutation checks: replacing the [Participation_gate.partition] call in
+   [Candidate_gates.apply] with [(longs, [])] keeps AAPL at $1M with no
+   warning; sizing the cap check off anything but the sized position (e.g. a
+   fixed size) makes the two accounts agree. Either turns this test red. *)
+let test_participation_cap_scales_with_live_account _ =
+  let adv =
+    Option.value_exn
+      (Weinstein_strategy.Entry_liquidity_gate.dollar_adv_for
+         ~config:Weinstein_strategy.Liquidity_config.default_config
+         ~bar_reader:(_breakout_bar_reader ()) ~current_date:_as_of "AAPL")
+  in
+  let cap = Some (2.0 *. _aapl_sized_at_100k () /. adv) in
+  let kept_and_warnings cash =
+    let snap = _participation_snap ~cash ~cap in
+    (_is_aapl_long_candidate snap, snap.warnings)
+  in
+  assert_that
+    (kept_and_warnings 100_000.0, kept_and_warnings 1_000_000.0)
+    (pair
+       (equal_to (1, []))
+       (pair (equal_to 0)
+          (elements_are
+             [
+               matching ~msg:"warning names AAPL and the participation cap"
+                 (fun w ->
+                   Option.some_if
+                     (String.is_substring w ~substring:"AAPL"
+                     && String.is_substring w
+                          ~substring:"max_entry_adv_participation")
+                     ())
+                 (equal_to ());
+             ])))
+
 (* ---- Spike-bar data-suspect flag (issue #2083 fix 3) ---- *)
 
 (* The spike fixture is [_sparse_tail_bar_reader]'s series: its LAST bar's close
@@ -1941,6 +2005,8 @@ let suite =
          >:: test_armed_spike_leaves_other_candidates_untouched;
          "armed spike flags SHORT candidate (kept) and warns"
          >:: test_armed_spike_flags_short_candidate_and_warns;
+         "participation cap scales with the live account"
+         >:: test_participation_cap_scales_with_live_account;
          "default resistance grade shows the v2 score (armed by default)"
          >:: test_default_resistance_grade_is_v2;
          "disarmed resistance grade degrades to the v1 label"

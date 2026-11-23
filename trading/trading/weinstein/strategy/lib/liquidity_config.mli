@@ -96,7 +96,8 @@ type t = {
           names the floor admits, and at a small account it admits names the
           floor alone would block once that floor is lowered.
           [min_entry_dollar_adv] stays applied as an absolute dust floor (the
-          APPB / corrupt-bar class). Applies to longs and shorts.
+          APPB / corrupt-bar class). The check does not look at the side, so it
+          applies to whatever entry the walk sizes; the unit tests drive longs.
 
           {b Default [None]}: no cap, byte-identical to the pre-#3681 walk, and
           no ADV is computed for it. Unpromoted. Override:
