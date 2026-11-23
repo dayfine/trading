@@ -141,7 +141,8 @@ executables, refreshes bars through the Friday (last week's warehouse superset p
 eligible list, one `fetch_symbols` per shard-disjoint bucket), rebuilds the inventory, the
 eligible universe (minus the csv-only names in
 `$TR/dev/weekly-picks/89a08b1fe/controls/csv-only-excluded.txt`) and the warehouse, then
-generates, validates and renders on `record-config-overrides.sexp`. Each step leaves a
+generates, validates and renders on `record-config-overrides.sexp` (the default `record`
+profile; see "Profiles"). Each step leaves a
 marker in `dev/data/weekly-picks-<friday>/done/`, so a re-run resumes at the first
 unfinished one. `SYSVER` defaults to the checkout's git HEAD; a jj workspace has none, so
 pass it. The bar store and the warehouse are read from the main checkout (`dev/data/`).
@@ -167,6 +168,43 @@ checkout; never commit it. Each run leaves a work dir (warehouse about 300 MB) a
 `dev/data/snapshots/universe-superset-<friday>.sexp`, which is next week's prior superset:
 delete old work dirs, keep the superset. A symbol never fetched before is not in the fetch
 set; fetch new listings with `ops-data` first.
+
+## Profiles
+
+`WEEKLY_PROFILE` picks the config and the universe floors (issue #3693):
+
+| profile | config | universe | records |
+|---|---|---|---|
+| `record` (default) | `record-config-overrides.sexp` | price ≥ 5, 30-day ADV ≥ $1M | `<sysver>/` |
+| `live-size` | the record file, then `live-size-overrides.sexp`, layered into `<work>/config-overrides.sexp` | price ≥ 5, 30-day ADV ≥ $100k | `<sysver>/live-size/` |
+
+`WEEKLY_MIN_PRICE` and `WEEKLY_MIN_ADV` override either profile's floors. The live-size
+work dir and warehouse superset carry a `-live-size` suffix, so both profiles can run for
+the same Friday.
+
+`live-size` is the record config for a live account with positions near $10k (user
+2026-11-18: "initially if we can buy $10k it's good enough -- this should be
+configurable"). It is a declared deviation from the 11-16 decision that the picks are what
+the backtest trades. It changes three fields:
+
+- `max_entry_adv_participation 0.10` (#3681): a long whose sized position exceeds 10 % of
+  its 20-day dollar ADV is dropped, with a warning line.
+- `min_entry_dollar_adv` 1M → 100k: the dust floor, equal to the universe floor. The
+  picks generator does not read it, so live the universe floor is the binding one.
+- `min_hold_dollar_adv` 500k → 50k. This stays a fixed floor: no field today scales the
+  hold exit with position size, and the picks generator never runs that exit. The file's
+  comments name the smallest change that would scale it.
+
+The account size is the `--portfolio` file, not a config field: at the $100k in
+`portfolio.sexp`, 1 % risk and the 14 % cap give positions of about $10k to $14k.
+
+**Published weeks and their profile.** Weeks before 2026-08-21 used
+`live-config-overrides.sexp` (see below).
+
+| Friday | records | profile |
+|---|---|---|
+| 2026-08-21 .. 2026-11-13 (13 weeks) | `89a08b1fe/` | `record` |
+| 2026-11-20 | `7a1251992/` | `record` |
 
 ## Superseded records
 

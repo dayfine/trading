@@ -10,10 +10,10 @@
 #              bucketed by shard key (first + last letter) so no two fetchers share a shard
 #   fetch      one fetch_symbols.exe per bucket, in parallel (fetch_buckets.sh)
 #   inventory  build_inventory (rewrites the tracked data/inventory.sexp: never commit it)
-#   eligible   eligible universe at the Friday (price >= 5, 30d ADV >= 1M, fresh bars)
+#   eligible   eligible universe at the Friday (price >= MIN_PRICE, 30d ADV >= MIN_ADV, fresh bars)
 #   universe   the picks universe (eligible minus the csv-only names) and this week's superset
 #   warehouse  build_snapshots through the Friday
-#   generate   generate_weekly_snapshot on the record config
+#   generate   generate_weekly_snapshot on the profile's config (record, or record + live-size)
 #   validate   validate_weekly_snapshot; errors do not stop the run (README "Weekly cadence")
 #   render     full .md/.html and the price-free public summary
 #   stage      full records -> $TR/dev/weekly-picks/<sysver>/, summary -> dev/weekly-picks/<sysver>/
@@ -35,6 +35,13 @@
 # dev/data/snapshots/universe-superset-<date>.sexp before the Friday); WEEKLY_CSV_ONLY
 # (default $TR/dev/weekly-picks/89a08b1fe/controls/csv-only-excluded.txt);
 # WEEKLY_ANY_DAY=1 (allow a non-Friday date, e.g. a holiday-shortened week).
+#
+# Profiles (issue #3693): WEEKLY_PROFILE=record (default) screens a $5 / $1M-ADV universe on
+# record-config-overrides.sexp. WEEKLY_PROFILE=live-size layers live-size-overrides.sexp on
+# the record config (written to <work>/config-overrides.sexp) and lowers the universe ADV floor
+# to $100k; its work dir, superset, private records and public summary carry a -live-size
+# suffix, so both profiles can run for one Friday. WEEKLY_MIN_PRICE / WEEKLY_MIN_ADV override
+# the profile's universe floors (defaults: 5.0, and 1000000.0 record / 100000.0 live-size).
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -84,27 +91,46 @@ if [ -z "$SYSVER" ]; then
   if [ "$DRY" = 1 ]; then SYSVER='<sysver>'; else die "no git HEAD in this checkout (a jj workspace): set SYSVER=<short sha of this code>"; fi
 fi
 
-WORK=${WEEKLY_WORK:-$MAIN/dev/data/weekly-picks-$FRIDAY}
+# Profile (issue #3693): the config layering, the universe floors and the suffix that keeps a
+# live-size run's work dir, superset and records apart from the record run of the same Friday.
+PROFILE=${WEEKLY_PROFILE:-record}
+case "$PROFILE" in
+  record) SFX=""; SUBDIR=""; DEFAULT_MIN_ADV=1000000.0 ;;
+  live-size) SFX=-live-size; SUBDIR=/live-size; DEFAULT_MIN_ADV=100000.0 ;;
+  *) printf 'weekly.sh: WEEKLY_PROFILE=%s: expected record or live-size\n' "$PROFILE" >&2; exit 2 ;;
+esac
+
+WORK=${WEEKLY_WORK:-$MAIN/dev/data/weekly-picks-$FRIDAY$SFX}
 DONE=$WORK/done
 SNAP=$MAIN/dev/data/snapshots
-SUPERSET=$SNAP/universe-superset-$FRIDAY.sexp
+SUPERSET=$SNAP/universe-superset-$FRIDAY$SFX.sexp
 OUTDIR=$WORK/out/$SYSVER
 PICKS=$OUTDIR/$FRIDAY.sexp
 WAREHOUSE=$WORK/warehouse
 CSV_ONLY=${WEEKLY_CSV_ONLY:-$TR/dev/weekly-picks/89a08b1fe/controls/csv-only-excluded.txt}
-TR_OUT=$TR/dev/weekly-picks/$SYSVER
-PUBLIC=${WEEKLY_PUBLIC_ROOT:-$ROOT}/dev/weekly-picks/$SYSVER/$FRIDAY-picks.md
+TR_OUT=$TR/dev/weekly-picks/$SYSVER$SUBDIR
+PUBLIC=${WEEKLY_PUBLIC_ROOT:-$ROOT}/dev/weekly-picks/$SYSVER$SUBDIR/$FRIDAY-picks.md
 CONFIG=dev/weekly-picks/record-config-overrides.sexp
+LIVE_SIZE_CONFIG=dev/weekly-picks/live-size-overrides.sexp
+LAYERED_CONFIG=$WORK/config-overrides.sexp
 PORTFOLIO=dev/weekly-picks/portfolio.sexp
+# What the public summary names as its config: the record file, or the two layered files. One
+# token: run-in-env.sh re-splits container arguments on whitespace (check_container_args).
+SUMMARY_CONFIG=$CONFIG${SFX:++live-size-overrides.sexp}
 
-PRIOR=${WEEKLY_PRIOR_SUPERSET:-$(ls "$SNAP" 2>/dev/null | grep -E '^universe-superset-[0-9]{4}-[0-9]{2}-[0-9]{2}\.sexp$' |
-  sort | awk -v dir="$SNAP" -v cut="universe-superset-$FRIDAY.sexp" '$0 < cut { last = $0 } END { if (last != "") print dir "/" last }')}
+# The newest superset of either profile dated before the Friday (a live-size superset holds the
+# record one, so either serves as last week's warehouse universe).
+PRIOR=${WEEKLY_PRIOR_SUPERSET:-$(ls "$SNAP" 2>/dev/null | grep -E '^universe-superset-[0-9]{4}-[0-9]{2}-[0-9]{2}(-live-size)?\.sexp$' |
+  sort | awk -v dir="$SNAP" -v cut="$FRIDAY" 'substr($0, 19, 10) < cut { last = $0 } END { if (last != "") print dir "/" last }')}
 [ -n "$PRIOR" ] || PRIOR="$SNAP/universe-superset-<none before $FRIDAY: set WEEKLY_PRIOR_SUPERSET>.sexp"
 
 # Recipe constants: eligibility gates, the pre-fetch staleness allowance, the warehouse start,
 # the shard-bucket count, and the validator's armed values (README "2026-11 backfill").
-MIN_PRICE=5.0
-MIN_ADV=1000000.0
+MIN_PRICE=${WEEKLY_MIN_PRICE:-5.0}
+MIN_ADV=${WEEKLY_MIN_ADV:-$DEFAULT_MIN_ADV}
+for v in "$MIN_PRICE" "$MIN_ADV"; do
+  printf '%s' "$v" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { printf 'weekly.sh: universe floor %s is not a number\n' "$v" >&2; exit 2; }
+done
 PRE_FETCH_STALENESS_DAYS=10
 WAREHOUSE_START=2024-06-01
 FETCH_BUCKETS=10
@@ -130,9 +156,9 @@ trading/weinstein/snapshot/bin/render_weekly_report.exe trading/weinstein/snapsh
 say() { printf '  + %s\n' "$*"; }
 writes() { printf '  writes[%s]: %s\n' "$1" "$2"; } # class: private ($TR), public (the -picks.md), local (gitignored)
 run() { say "$*"; [ "$DRY" = 1 ] || "$@"; }
-crun() { say "[container] $*"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@"; }
-crun_log() { _f=$1; shift; say "[container] $* > $_f 2>&1"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_f" 2>&1; }
-crun_out() { _o=$1; _e=$2; shift 2; say "[container] $* > $_o 2> $_e"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_o" 2> "$_e"; }
+crun() { check_container_args "$@"; say "[container] $*"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@"; }
+crun_log() { _f=$1; shift; check_container_args "$@"; say "[container] $* > $_f 2>&1"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_f" 2>&1; }
+crun_out() { _o=$1; _e=$2; shift 2; check_container_args "$@"; say "[container] $* > $_o 2> $_e"; [ "$DRY" = 1 ] || sh "$RUNENV" "$@" > "$_o" 2> "$_e"; }
 
 # Symbols (one per line) of a universe / eligible / superset sexp.
 syms() { tr '\n' ' ' < "$1" | awk '{ n = split($0, p, "\\(symbol "); for (i = 2; i <= n; i++) print substr(p[i], 1, index(p[i], ")") - 1) }'; }
@@ -153,6 +179,10 @@ pinned_universe() {
     echo "))"; } > "$3"
 }
 
+# layer_config <record> <profile> <out>: the record overrides, then the profile's, as one file.
+# Overlays apply in order, so each profile line replaces just the field it names.
+layer_config() { cat "$1" "$2" > "$3"; }
+
 # pinned_superset <prior-superset> <eligible> <out>: the warehouse universe, symbols only.
 pinned_superset() {
   { echo "(Pinned ("
@@ -163,7 +193,7 @@ pinned_superset() {
 step_preflight() {
   if [ "$DRY" = 1 ]; then
     say "would check: EODHD_API_KEY is set (never printed); $TR is a git checkout; $WORK is git-ignored;"
-    say "would check: $CONFIG, $PORTFOLIO, the csv-only list and the prior superset exist; the dev container is up"
+    say "would check: $CONFIG, $PORTFOLIO,${SFX:+ $LIVE_SIZE_CONFIG,} the csv-only list and the prior superset exist; the dev container is up"
     return 0
   fi
   [ -n "${EODHD_API_KEY:-}" ] || die "EODHD_API_KEY is not set"
@@ -171,6 +201,7 @@ step_preflight() {
   case "$WORK" in "$MAIN"/*) ;; *) die "WEEKLY_WORK must be under $MAIN (the container mount)" ;; esac
   git -C "$MAIN" check-ignore -q "$WORK/x" || die "$WORK is not git-ignored; refusing to write bar-derived files there"
   for f in "$ROOT/$CONFIG" "$ROOT/$PORTFOLIO" "$CSV_ONLY" "$PRIOR"; do [ -f "$f" ] || die "missing input: $f"; done
+  [ "$PROFILE" = record ] || [ -f "$ROOT/$LIVE_SIZE_CONFIG" ] || die "missing input: $ROOT/$LIVE_SIZE_CONFIG"
   grep -q "(symbol GSPC.INDX)" "$PRIOR" || die "$PRIOR has no GSPC.INDX: it is not a warehouse superset"
   mkdir -p "$DONE" "$WORK/fetch/logs" "$WORK/logs" "$OUTDIR"
 }
@@ -226,9 +257,15 @@ step_warehouse() {
 }
 
 step_generate() {
+  gen_config=../$CONFIG
+  if [ "$PROFILE" = live-size ]; then
+    run layer_config "$ROOT/$CONFIG" "$ROOT/$LIVE_SIZE_CONFIG" "$LAYERED_CONFIG"
+    writes local "$LAYERED_CONFIG"
+    gen_config=$(cpath "$LAYERED_CONFIG")
+  fi
   crun_log "$WORK/logs/generate.log" $B/trading/weinstein/snapshot/gen/bin/generate_weekly_snapshot.exe \
     --as-of "$FRIDAY" --universe "$CWORK/universe.sexp" --bars-snapshot-dir "$CWAREHOUSE" \
-    --snapshot-dir "$CWORK/out" --system-version "$SYSVER" --config-overrides "../$CONFIG" --portfolio "../$PORTFOLIO"
+    --snapshot-dir "$CWORK/out" --system-version "$SYSVER" --config-overrides "$gen_config" --portfolio "../$PORTFOLIO"
   writes local "$PICKS"
 }
 
@@ -247,7 +284,7 @@ step_render() {
     "$CPICKS" -bars-snapshot-dir "$CWAREHOUSE" -html-out "$COUT/$FRIDAY.html"
   writes local "$OUTDIR/$FRIDAY.md"
   writes local "$OUTDIR/$FRIDAY.html"
-  crun_out "$OUTDIR/$FRIDAY-picks.md" "$WORK/logs/summary.err" $B/trading/weinstein/snapshot/bin/public_picks_summary.exe "$CPICKS"
+  crun_out "$OUTDIR/$FRIDAY-picks.md" "$WORK/logs/summary.err" $B/trading/weinstein/snapshot/bin/public_picks_summary.exe "$CPICKS" -config-path "$SUMMARY_CONFIG"
   writes local "$OUTDIR/$FRIDAY-picks.md"
   [ "$DRY" = 1 ] || check_public_price_free "$OUTDIR/$FRIDAY-picks.md"
 }
@@ -283,8 +320,8 @@ step() {
   if [ "$1" != preflight ] && [ "$DRY" = 0 ]; then : > "$DONE/$1"; fi
 }
 
-printf 'weekly.sh: friday=%s sysver=%s dry_run=%s\n  repo=%s\n  work=%s\n  trading-results=%s\n' \
-  "$FRIDAY" "$SYSVER" "$DRY" "$ROOT" "$WORK" "$TR"
+printf 'weekly.sh: friday=%s sysver=%s profile=%s (universe: price >= %s, 30d ADV >= %s) dry_run=%s\n  repo=%s\n  work=%s\n  trading-results=%s\n' \
+  "$FRIDAY" "$SYSVER" "$PROFILE" "$MIN_PRICE" "$MIN_ADV" "$DRY" "$ROOT" "$WORK" "$TR"
 for s in $STEPS; do step "$s"; done
 
 if [ "$DRY" = 1 ]; then
@@ -298,8 +335,9 @@ fi
 cat <<EOF
 == publish (this script does not commit, push or open PRs)
   1. private records:
-       git -C $TR add dev/weekly-picks/$SYSVER && git -C $TR commit -m "weekly-picks $SYSVER: $FRIDAY" && git -C $TR push
+       git -C $TR add dev/weekly-picks/$SYSVER && git -C $TR commit -m "weekly-picks $SYSVER: $FRIDAY ($PROFILE)" && git -C $TR push
   2. public summary $PUBLIC:
        from a docs branch off main@origin: commit that one file, push, open a docs PR; quote
-       \$(git -C $TR rev-parse --short HEAD) in the PR body as the private record
+       \$(git -C $TR rev-parse --short HEAD) in the PR body as the private record, and add the Friday
+       and its profile ($PROFILE) to the README table of published weeks
 EOF
