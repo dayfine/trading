@@ -15,8 +15,9 @@ let _run_one ~fixtures_root (s : scenario) cell =
   let sector_map_override = _sector_map_of_scenario ~fixtures_root s in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
-      ~end_date:s.period.end_date ~overrides:merged_overrides
-      ?sector_map_override ~strategy_choice:s.strategy ()
+      ~end_date:s.period.end_date ~initial_cash:s.initial_cash
+      ~overrides:merged_overrides ?sector_map_override
+      ~strategy_choice:s.strategy ()
   in
   result.summary.metrics
 

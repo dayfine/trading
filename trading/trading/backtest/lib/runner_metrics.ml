@@ -6,7 +6,6 @@ open Trading_simulation
     window. The three functions below restore the invariant that the published
     metrics describe the measurement window only. *)
 
-let initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
 (** Sentinel year used when constructing a dummy [config] for metric re-runs
@@ -21,8 +20,8 @@ let _empty_date_sentinel_year = 2000
     folds the warmup window's drawdown, return volatility, and total return into
     the published values; this overlay restores the metrics' values to "what
     happened during the measurement window only". *)
-let recompute_in_window_step_metrics ?cash_yield ~steps_in_range ~start_date
-    ~end_date () =
+let recompute_in_window_step_metrics ?cash_yield ~initial_cash ~steps_in_range
+    ~start_date ~end_date () =
   let config : Trading_simulation_types.Simulator_types.config =
     {
       start_date;
@@ -50,7 +49,7 @@ let recompute_in_window_step_metrics ?cash_yield ~steps_in_range ~start_date
     MaxDrawdown; once the overlay has replaced those with in-window values, the
     published [CalmarRatio] must follow or the ratio is inconsistent with its
     components. *)
-let recompute_calmar_ratio ~base_metrics =
+let recompute_calmar_ratio ~initial_cash ~base_metrics =
   let dummy_config : Trading_simulation_types.Simulator_types.config =
     {
       start_date =
@@ -75,8 +74,8 @@ let recompute_calmar_ratio ~base_metrics =
 
     3. Recompute [CalmarRatio] from the overlaid CAGR / MaxDrawdown so the
     derived metric stays consistent with its components. *)
-let align_summary_metrics ?cash_yield ~sim_result ~round_trips ~steps_in_range
-    ~start_date ~end_date () =
+let align_summary_metrics ?cash_yield ~initial_cash ~sim_result ~round_trips
+    ~steps_in_range ~start_date ~end_date () =
   let merge = Trading_simulation_types.Metric_types.merge in
   let after_round_trips =
     merge sim_result.Trading_simulation_types.Simulator_types.metrics
@@ -84,7 +83,8 @@ let align_summary_metrics ?cash_yield ~sim_result ~round_trips ~steps_in_range
   in
   let after_step =
     merge after_round_trips
-      (recompute_in_window_step_metrics ?cash_yield ~steps_in_range ~start_date
-         ~end_date ())
+      (recompute_in_window_step_metrics ?cash_yield ~initial_cash
+         ~steps_in_range ~start_date ~end_date ())
   in
-  merge after_step (recompute_calmar_ratio ~base_metrics:after_step)
+  merge after_step
+    (recompute_calmar_ratio ~initial_cash ~base_metrics:after_step)

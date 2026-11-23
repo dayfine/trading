@@ -40,6 +40,7 @@ let _make_base ?(name = "base-test") ?(description = "base-desc")
     strategy;
     slippage_bps;
     cost_model;
+    initial_cash = Backtest.Runner.default_initial_cash;
     expected;
   }
 

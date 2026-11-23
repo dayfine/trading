@@ -64,9 +64,10 @@ let[@inline never] _extract_fold ~fixtures_root ~bar_data_source ~shared_panels
   in
   let result =
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
-      ~end_date:s.period.end_date ~overrides:s.config_overrides
-      ?sector_map_override ~strategy_choice:s.strategy
-      ?slippage_bps:s.slippage_bps ?bar_data_source ?shared_panels ()
+      ~end_date:s.period.end_date ~initial_cash:s.initial_cash
+      ~overrides:s.config_overrides ?sector_map_override
+      ~strategy_choice:s.strategy ?slippage_bps:s.slippage_bps ?bar_data_source
+      ?shared_panels ()
   in
   let summary = result.summary in
   let get k = Map.find summary.metrics k |> Option.value ~default:Float.nan in

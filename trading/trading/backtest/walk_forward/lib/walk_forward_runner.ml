@@ -22,6 +22,7 @@ let build_fold_scenario ~(base : Scenario.t) ~(fold : Window_spec.fold)
     strategy = base.strategy;
     slippage_bps = base.slippage_bps;
     cost_model = base.cost_model;
+    initial_cash = base.initial_cash;
     expected = base.expected;
   }
 

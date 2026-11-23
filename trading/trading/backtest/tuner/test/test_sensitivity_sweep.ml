@@ -533,6 +533,7 @@ let _stub_base () : Scenario.t =
     strategy = Backtest.Strategy_choice.default;
     slippage_bps = None;
     cost_model = None;
+    initial_cash = Backtest.Runner.default_initial_cash;
     expected;
   }
 

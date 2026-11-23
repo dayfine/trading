@@ -41,8 +41,9 @@ let _leg_thunk ~(scenario : Scenario.t) ~sector_map_override ~bar_data_source
     (leg : leg_spec) () : Runner.leg_result =
   let result =
     Backtest.Runner.run_backtest ~start_date:scenario.period.start_date
-      ~end_date:scenario.period.end_date ~overrides:leg.overrides
-      ?sector_map_override ~strategy_choice:leg.strategy ?bar_data_source ()
+      ~end_date:scenario.period.end_date ~initial_cash:scenario.initial_cash
+      ~overrides:leg.overrides ?sector_map_override
+      ~strategy_choice:leg.strategy ?bar_data_source ()
   in
   {
     Runner.name = leg.name;

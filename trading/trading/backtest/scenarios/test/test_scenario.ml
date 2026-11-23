@@ -287,6 +287,48 @@ let test_loader_strategy_extra_field_tolerated _ =
    with [None] (skip-the-overlay semantic — runs on the byte-equal zero-cost
    baseline path). Item 1 of the four-item cost-model wiring plan tracked in
    [dev/status/cost-model.md]. *)
+
+(** A spec without [initial_cash] runs at the $1M default, and at that default
+    the field is dropped from [sexp_of_t] so re-serialised specs are unchanged
+    (#3696). *)
+let test_initial_cash_absent_is_default _ =
+  let s =
+    Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
+  in
+  assert_that s
+    (all_of
+       [
+         field
+           (fun (s : Scenario.t) -> s.initial_cash)
+           (float_equal 1_000_000.0);
+         field
+           (fun s -> Sexp.to_string (Scenario.sexp_of_t s))
+           (not_ (contains_substring "initial_cash"));
+       ])
+
+let _make_sexp_with_initial_cash =
+  sprintf
+    {|
+  ((name "test-scenario")
+   (description "Unit-test fixture")
+   (period ((start_date 2023-01-02) (end_date 2023-12-31)))
+   (config_overrides ())
+   (initial_cash 100000.0)
+   (expected
+    (%s)))
+  |}
+    _base_expected_fields
+
+(** [(initial_cash 100000.0)] parses and survives a sexp round trip. *)
+let test_initial_cash_present_roundtrips _ =
+  let original =
+    Scenario.t_of_sexp (Sexp.of_string _make_sexp_with_initial_cash)
+  in
+  let roundtripped = Scenario.t_of_sexp (Scenario.sexp_of_t original) in
+  assert_that
+    (original.initial_cash, roundtripped.initial_cash)
+    (pair (float_equal 100_000.0) (float_equal 100_000.0))
+
 let test_cost_model_field_absent _ =
   let s =
     Scenario.t_of_sexp (Sexp.of_string (_make_sexp ~extra_expected_fields:""))
@@ -393,6 +435,10 @@ let suite =
          >:: test_universe_schedule_parses_and_roundtrips;
          "extra loader_strategy field is tolerated (post-3.4 backward compat)"
          >:: test_loader_strategy_extra_field_tolerated;
+         "initial_cash absent => 1M default, not serialised"
+         >:: test_initial_cash_absent_is_default;
+         "initial_cash present => parses + round-trips"
+         >:: test_initial_cash_present_roundtrips;
          "cost_model absent => None" >:: test_cost_model_field_absent;
          "cost_model present => Some record" >:: test_cost_model_field_present;
          "cost_model sexp round-trips" >:: test_cost_model_roundtrip;

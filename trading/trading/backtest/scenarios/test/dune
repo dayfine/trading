@@ -14,7 +14,8 @@
   test_bar_source_resolver
   test_ladder_v4_overlays
   test_output_root
-  test_scenario_runner_resume)
+  test_scenario_runner_resume
+  test_scenario_initial_cash_e2e)
  (modules
   test_scenario
   test_universe_file
@@ -30,7 +31,8 @@
   test_bar_source_resolver
   test_ladder_v4_overlays
   test_output_root
-  test_scenario_runner_resume)
+  test_scenario_runner_resume
+  test_scenario_initial_cash_e2e)
  (libraries
   ounit2
   core
