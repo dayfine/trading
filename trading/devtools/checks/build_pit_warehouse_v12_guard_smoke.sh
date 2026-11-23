@@ -17,6 +17,8 @@
 #   f. prune_orphans keeps the .snap of a planned leg still in the manifest (v11 EMBT); the warning is logged.
 #   g. a saved plan from a different run (union id mismatch) is refused.  h. no pairs: apply-alias instruction printed.
 #   i. superset deletes the saved plan and stale twin-scan directory.
+#   j. VERSION/CHUNKS: 6 chunks + 15 pair scans, pit-<v>/quarantine.txt excluded from the union and expected-absent in verify.
+#   k. CONTAINER=none: the real dx/cp helpers run locally with no docker call.
 #   Each case runs in a subshell; fatal guards still allow later cases and the summary.
 #   d. D6: the expected-absent set is MEL + alias-delta legs only; an unaliased absent list symbol (also an `_old` one)
 #      aborts verify, and a list that follows the alias delta passes.
@@ -224,6 +226,74 @@ expect "i: superset with stale twin state exits 0" 0 "$rc"
   || bad "i: stale scan directory survived"
 }
 
+# j. VERSION/CHUNKS parameters: 6 chunks, the extra quarantine, all 15 pair scans, extra builds numbered after the chunks
+case_j() {
+fresh
+V11EXP="$SB/v11"; mkdir -p "$V11EXP/results"; : > "$V11EXP/results/quarantine.txt"
+: > "$V12/warehouse-extras.txt"
+rm -f "$V12"/composition/*.sexp
+{ i=1; while [ "$i" -le 30 ]; do printf '((symbol S%02d))\n' "$i"; i=$((i + 1)); done; echo '((symbol BAD))'; echo '((symbol MEL))'; } > "$V12/composition/top-3000-2000.sexp"
+echo 'BAD absurd avg_dollar_volume' > "$V12/quarantine.txt"
+CHUNKS=6; C_FALSE=chunk7; C_TWIN=chunk8; C_COLL=chunk9
+rc=0; ( phase_superset ) > "$WORK/j.out" 2>&1 || rc=$?
+expect "j: superset with CHUNKS=6 exits 0" 0 "$rc"
+n=$(ls "$WORK"/chunk-*.txt | wc -l | tr -d ' ')
+[ "$n" = 6 ] && ok "j: six chunk files" || bad "j: $n chunk files"
+[ "$(cat "$WORK"/chunk-[1-6].txt | wc -l | tr -d ' ')" = 31 ] && ok "j: chunks hold the 30 symbols + GSPC.INDX" || bad "j: chunk contents"
+grep -q -x BAD "$WORK/union.txt" && bad "j: quarantined BAD is in the union" || ok "j: quarantined BAD is not in the union"
+[ "$(chunk_pairs | wc -l | tr -d ' ')" = 15 ] && [ "$(chunk_pairs | sed -n 1p)" = "1 2" ] && [ "$(chunk_pairs | sed -n 15p)" = "5 6" ] \
+  && ok "j: 15 chunk pairs, 1 2 .. 5 6" || bad "j: chunk pairs"
+CHUNKS=4; [ "$(chunk_pairs | tr '\n' ',')" = "1 2,1 3,1 4,2 3,2 4,3 4," ] && ok "j: CHUNKS=4 keeps the six v12 pairs in order" || bad "j: v12 pairs"
+CHUNKS=6
+# verify: BAD is a list symbol absent from the warehouse, expected only because of the quarantine file
+: > "$WORK/syms.txt"; cat "$WORK"/chunk-[1-6].txt >> "$WORK/syms.txt"; LC_ALL=C sort -u -o "$WORK/syms.txt" "$WORK/syms.txt"
+pinned_spec "$WORK/syms.txt" > "$WORK/all.sexp"
+rm -rf "$OUT"; ( run_build chunk1 "$WORK/all.sexp" ) > "$WORK/j1.out" 2>&1 || { cat "$WORK/j1.out"; bad "j: build"; }
+: > "$WORK/alias-inchunk.txt"
+rc=0; ( phase_verify ) > "$WORK/j2.out" 2>&1 || rc=$?
+expect "j: verify passes: BAD (quarantine) and MEL are expected-absent" 0 "$rc"
+rm -f "$V12/quarantine.txt"
+rc=0; ( phase_verify ) > "$WORK/j3.out" 2>&1 || rc=$?
+expect "j: without the quarantine file BAD is unexpected-absent and verify aborts" 1 "$rc"
+}
+
+# k. CONTAINER=none: dx/cp_in/cp_out run locally (the real helpers, re-sourced), no docker; version-named /tmp files
+case_k() {
+fresh
+V=vsmoke$$
+( CONTAINER=none VERSION=$V OUT="$SB/outk" WORK="$SB/workk"; export CONTAINER VERSION OUT WORK
+  unset CSV; . "$SCRIPT"; EXC="$SB/exc.sexp"   # sourced: HERE follows $0 (this file), so point the exceptions at the sandbox
+  docker() { echo "docker must not be called: $*" >&2; exit 99; }
+  [ "$CSV" = "$HERE/data" ] && echo CSV_OK
+  pinned_spec "$SB/work/syms.txt" > "$SB/workk/k.sexp"
+  run_build chunk1 "$SB/workk/k.sexp"
+  [ -e "/tmp/$V-chunk1.sexp" ] && echo TMP_OK
+  assert_manifest_matches final_k ) > "$SB/k.out" 2>&1 || { cat "$SB/k.out"; bad "k: none-mode build"; }
+rm -f /tmp/$V-chunk1.*
+grep -q CSV_OK "$SB/k.out" && ok "k: CSV defaults to the checkout's data/ in none mode" || bad "k: CSV default"
+grep -q TMP_OK "$SB/k.out" && ok "k: the spec is staged as /tmp/<VERSION>-<tag>.sexp" || bad "k: staging"
+grep -q 'docker must not be called' "$SB/k.out" && bad "k: docker was called" || ok "k: no docker call"
+[ "$(ls "$SB/outk"/*.snap | wc -l | tr -d ' ')" = 20 ] && ok "k: 20 .snap files built locally" || bad "k: snaps"
+grep -q 'final_k: manifest=20 snaps=20' "$SB/workk/build.log" && ok "k: guard ran on the local output" || bad "k: guard log"
+}
+
+
+# l. extra-build numbering is computed from CHUNKS (not hard-coded) and a bad CHUNKS is refused
+case_l() {
+fresh
+V=vsmokel$$
+names() { ( CONTAINER=none VERSION=$V OUT="$SB/outl" WORK="$SB/workl"; export CONTAINER VERSION OUT WORK
+            unset CSV; [ -n "${1:-}" ] && CHUNKS=$1 && export CHUNKS
+            . "$SCRIPT"; echo "$C_FALSE $C_TWIN $C_COLL" ); }
+[ "$(unset CHUNKS; names)" = "chunk5 chunk6 chunk7" ] && ok "l: default CHUNKS=4 numbers the extras chunk5/6/7" || bad "l: default numbering"
+[ "$(names 6)" = "chunk7 chunk8 chunk9" ] && ok "l: CHUNKS=6 numbers the extras chunk7/8/9" || bad "l: CHUNKS=6 numbering"
+for c in 0 x; do
+  rc=0; ( CONTAINER=none VERSION=$V OUT="$SB/outl" WORK="$SB/workl" CHUNKS=$c; export CONTAINER VERSION OUT WORK CHUNKS
+          . "$SCRIPT" ) > "$SB/l.out" 2>&1 || rc=$?
+  expect "l: CHUNKS=$c is refused with exit 2" 2 "$rc"
+done
+}
+
 run_case case_a
 run_case case_c
 run_case case_b
@@ -233,6 +303,9 @@ run_case case_f
 run_case case_g
 run_case case_h
 run_case case_i
+run_case case_j
+run_case case_k
+run_case case_l
 
 PASS=$(grep -c '^PASS$' "$RESULTS" || true)
 FAIL=$(grep -c '^FAIL$' "$RESULTS" || true)

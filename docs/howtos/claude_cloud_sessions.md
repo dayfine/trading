@@ -156,6 +156,50 @@ unpacking:
 
 With that step the rk-k0 cloud run matched the record byte-identically (2026-11-09).
 
+## Building a PIT warehouse in a session (v13)
+
+The pit-v13 lists (`trading/test_data/backtest_scenarios/pit-v13/`, top-4000 true-dollar-volume, 1998-2026,
+union 13,747 names after quarantine) need a warehouse that does not exist yet. The build needs no local machine: `dev/scripts/build_pit_warehouse_v13.sh` runs the same phases as the v12 script, with the
+exe running in the session's `trading-1-dev` container (image `ghcr.io/dayfine/trading-ci:latest`, which has the exe's
+`libta-lib.so.0`) and the script, `r2_bars.sh` and the bar store on the session host. It takes hours, so launch it detached (see "Backtest chain longer than 2 h").
+Everything goes under `.sweep-output/` (gitignored), not `/tmp`, which a worker restart wipes.
+
+```sh
+# 1. the bar store (private R2, 16,203 symbols). data/ already holds tracked files, so pull elsewhere.
+sh dev/scripts/r2_bars.sh pull --dest "$PWD/.sweep-output/data" --name data-20261123
+# 2. the container, with the checkout mounted where the script expects it (skip the run if trading-1-dev is already up
+#    with this mount), and the exe built in it
+docker start trading-1-dev 2>/dev/null || docker run -d --name trading-1-dev -v $PWD:/workspaces/trading-1 \
+  ghcr.io/dayfine/trading-ci:latest sleep infinity
+docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && eval $(opam env) && dune build analysis/scripts/build_snapshots/build_snapshots.exe'
+# 3. build (docker mode: CSV, OUT and RUN_TREE are container paths under the mount, WORK a host path); phases preflight
+#    superset chunks classify chunk5 twinscan twinfix verify, each resumable
+WORK="$PWD/.sweep-output/pit-v13-work"
+export CONTAINER=trading-1-dev RUN_TREE=/workspaces/trading-1 HOST_ROOT="$PWD" CHUNKS=6 WORK \
+  CSV=/workspaces/trading-1/.sweep-output/data \
+  OUT=/workspaces/trading-1/.sweep-output/warehouse/snap_top4000_pit_v13pit
+setsid nohup sh dev/scripts/build_pit_warehouse_v13.sh all >> "$WORK.out" 2>&1 < /dev/null &
+# 4. upload (the name carries the manifest count that `verify` logged), then check it from R2's side
+sh dev/scripts/r2_bars.sh push-dir --dir "$PWD/.sweep-output/warehouse/snap_top4000_pit_v13pit" --name v13pit-<N> --resume
+sh dev/scripts/r2_bars.sh verify-dir --dir "$PWD/.sweep-output/warehouse/snap_top4000_pit_v13pit" --name v13pit-<N>
+```
+
+- `CHUNKS=6` is the v13 default of the wrapper: about 2.3k names per chunk, as in v11, so a chunk build peaks near
+  5 GB (v11 measured 5-6 GB at 2.5k names) and a pair scan (two chunks) near 4 GB. The session VM has 5 GB, so use
+  `CHUNKS=8` (1.7k names) if a chunk build is OOM-killed (exit 137); the pair scans become
+  C(CHUNKS,2) smaller ones (15 at 6, 28 at 8) and the extra builds are numbered after the chunks. `CHUNKS=4` is the v12
+  setting.
+- `CONTAINER=none` (all commands on the session host, no docker) stays supported, but only on a host that has the image's
+  runtime libraries (`libta-lib.so.0`, opam, `git`, `pgrep`, `free`); a stock session host has none, so use the container.
+- `pit-v13/quarantine.txt` (DNGFF, HLAN, MDFI, SYNI: absurd average dollar volume) is dropped from the union and is
+  expected-absent in `verify`; the lists still name them.
+- `preflight` needs a clean tree (it checks the exe's checkout with `git status`) and 30 GB free. After a restart, rerun a
+  single phase (`sh dev/scripts/build_pit_warehouse_v13.sh <phase>`); `twinfix` reuses its saved plan.
+- Readers of the finished warehouse export `SNAPSHOT_MAX_MMAP_HANDLES` at or above the manifest size (the wrapper's
+  default is 16000, the v12 script's 12000).
+- The v13 lists are not twin-aliased yet. After `twinfix`, apply `$WORK/alias-v12-new.txt` (the file name is the same
+  for every version) with the `alias-lists.pl` command the script logs, then regenerate the list `.md5` files.
+
 ## Building and testing inside a session
 
 ```sh
