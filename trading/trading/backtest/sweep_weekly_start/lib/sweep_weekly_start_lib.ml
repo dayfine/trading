@@ -205,16 +205,10 @@ let _run_one_exn (cfg : config) (start_date : Date.t) ~sector_map_override =
   let strategy_choice : Scenario_strategy.t =
     Scenario_strategy.Bah_benchmark { symbol = cfg.symbol }
   in
-  (* This sweep runs at [Backtest.Runner.default_initial_cash] ($1M): it does
-     not pass [run_backtest ?initial_cash] (#3696), so its cells stay
-     byte-identical to earlier sweeps. BAH is linear in
-     initial cash to a near-zero residual (commissions are $0.01/share, so on
-     a $1M -> $100k re-scaling the commission drag changes by ~10x relative
-     to final equity but ~$40 absolute — negligible for entry-timing
-     dispersion analysis). We accept the small bias and re-scale the final
-     value proportionally so the [cell.final_value] field matches the
-     user-configured [initial_cash]. Returns / CAGR / Sharpe / max-DD are all
-     ratios and don't need re-scaling. *)
+  (* Runs at the runner's default $1M (no [?initial_cash], so cells stay
+     byte-identical to earlier sweeps) and rescales [final_value] to
+     [cfg.initial_cash]. BAH is linear in cash up to ~$40 of commission drag,
+     negligible here; returns, CAGR, Sharpe and max-DD are ratios. *)
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date:cfg.end_date
       ~sector_map_override ~strategy_choice ()
