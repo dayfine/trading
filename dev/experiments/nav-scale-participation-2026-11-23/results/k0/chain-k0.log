@@ -1,0 +1,51 @@
+[11-23 09:38:46Z] nav-scale-participation run k0; SC_SHA=44f1ba28e99701d948d6a9117d5a1a4599e2d3f7 CELL_TIMEOUT=20000s
+[11-23 09:38:51Z] HEAD=44f1ba28e image=ghcr.io/dayfine/trading-ci:latest sha256:886851cbc0f1 mem=15G par=2
+[11-23 09:38:51Z] disk free 52G
+[11-23 09:38:51Z] disk free 52G
+[11-23 09:38:51Z] PULL warehouse v12wk-9236
+[11-23 09:47:02Z] PULL corpact corpact-2026-10-27
+[11-23 09:47:03Z] PULL bars data-20261102
+[11-23 09:47:29Z] TD: removed 0 dividends/splits files newer than corpact-2026-10-27
+[11-23 09:47:30Z] STAGE OK: warehouse 9236 entries, TD 11880 dividends.csv
+[11-23 09:47:30Z] BUILD
+[11-23 09:48:09Z] BUILD_DONE
+[11-23 09:48:09Z] SPEC CHECKS OK k0 (ns-F-*-k0 = rk-k0 at 1e5 / default / 1e7 cash; ns-P-*-k0 = the same + dev/weekly-picks/live-size-overrides.sexp appended last)
+[11-23 09:48:09Z] PREFLIGHT ns-F-1M-k0 (to 2000-03-31)
+[11-23 09:52:23Z] PREFLIGHT_OK ns-F-1M-k0 (254s, initial_cash=1000000.00, n_symbols=9200 absent=1)
+[11-23 09:52:23Z] PREFLIGHT ns-F-100k-k0 (to 2000-03-31)
+[11-23 09:56:29Z] PREFLIGHT_OK ns-F-100k-k0 (246s, initial_cash=100000.00, n_symbols=9200 absent=1)
+[11-23 09:56:29Z] PREFLIGHT ns-F-10M-k0 (to 2000-03-31)
+[11-23 10:00:33Z] PREFLIGHT_OK ns-F-10M-k0 (244s, initial_cash=10000000.00, n_symbols=9200 absent=1)
+[11-23 10:00:33Z] PREFLIGHT ns-P-100k-k0 (to 2000-03-31)
+[11-23 10:04:38Z] PREFLIGHT_OK ns-P-100k-k0 (245s, initial_cash=100000.00, n_symbols=9200 absent=1)
+[11-23 10:04:38Z] PREFLIGHT ns-P-1M-k0 (to 2000-03-31)
+[11-23 10:08:38Z] PREFLIGHT_OK ns-P-1M-k0 (240s, initial_cash=1000000.00, n_symbols=9200 absent=1)
+[11-23 10:08:38Z] PREFLIGHT ns-P-10M-k0 (to 2000-03-31)
+[11-23 10:12:43Z] PREFLIGHT_OK ns-P-10M-k0 (245s, initial_cash=10000000.00, n_symbols=9200 absent=1)
+[11-23 10:12:43Z] RUN ns-F-1M-k0-s0
+[11-23 12:18:34Z] RESULT ns-F-1M-k0-s0 => log_nav_ratio 2.5456 total_return_pct 1175.0450649153679 max_drawdown_pct 39.571104816052646 peak_rss_kb=5770828 (wall 7551s)
+[11-23 12:18:34Z] TRIPWIRE MATCH ns-F-1M-k0-s0 trades.csv md5 3ee10dca319e54a85f5e0a7842d8c537 (560 lines)
+[11-23 12:18:34Z] CELLS k0: to run: F-100k F-10M P-100k P-1M P-10M (PAR 2)
+[11-23 12:18:34Z] RUN ns-F-10M-k0-s0
+[11-23 12:18:34Z] RUN ns-F-100k-k0-s0
+[11-23 14:27:23Z] RESULT ns-F-100k-k0-s0 => log_nav_ratio 2.5854 total_return_pct 1226.8508241287213 max_drawdown_pct 39.562761083267752 peak_rss_kb=5737204 (wall 7729s)
+[11-23 14:27:43Z] RESULT ns-F-10M-k0-s0 => log_nav_ratio 2.5382 total_return_pct 1165.7321962919939 max_drawdown_pct 39.5720449732202 peak_rss_kb=5730828 (wall 7749s)
+[11-23 14:27:43Z] disk free 46G
+[11-23 14:27:43Z] RUN ns-P-100k-k0-s0
+[11-23 14:27:43Z] RUN ns-P-1M-k0-s0
+[11-23 16:38:57Z] RESULT ns-P-100k-k0-s0 => log_nav_ratio 2.5739 total_return_pct 1211.741347364356 max_drawdown_pct 39.552467904837961 peak_rss_kb=5750452 (wall 7874s)
+[11-23 16:39:49Z] RESULT ns-P-1M-k0-s0 => log_nav_ratio 2.3368 total_return_pct 934.77131871556708 max_drawdown_pct 39.5704370828535 peak_rss_kb=5753216 (wall 7926s)
+[11-23 16:39:49Z] disk free 46G
+[11-23 16:39:49Z] RUN ns-P-10M-k0-s0
+[11-23 18:39:39Z] RESULT ns-P-10M-k0-s0 => log_nav_ratio 1.7961 total_return_pct 502.63157004587765 max_drawdown_pct 36.088566540972224 peak_rss_kb=5691312 (wall 7190s)
+[11-23 18:39:39Z] EXTRACT ns-F-1M-k0-s0: 662 placed, Adv_participation_cap skips 0 (lower bound)
+[11-23 18:39:39Z] EXTRACT ns-F-100k-k0-s0: 662 placed, Adv_participation_cap skips 0 (lower bound)
+[11-23 18:39:39Z] EXTRACT ns-F-10M-k0-s0: 664 placed, Adv_participation_cap skips 0 (lower bound)
+[11-23 18:39:40Z] EXTRACT ns-P-100k-k0-s0: 665 placed, Adv_participation_cap skips 2 (lower bound)
+[11-23 18:39:40Z] EXTRACT ns-P-1M-k0-s0: 664 placed, Adv_participation_cap skips 31 (lower bound)
+[11-23 18:39:40Z] EXTRACT ns-P-10M-k0-s0: 434 placed, Adv_participation_cap skips 252 (lower bound)
+[11-23 18:39:40Z] LIVE k0 100k: trades.csv P vs F differ; P Adv_participation_cap skips 2; V6 exit=0
+[11-23 18:39:41Z] LIVE k0 1M: trades.csv P vs F differ; P Adv_participation_cap skips 31; V6 exit=0
+[11-23 18:39:41Z] LIVE k0 10M: trades.csv P vs F differ; P Adv_participation_cap skips 252; V6 exit=0
+[11-23 18:39:42Z] COLLECT k0: public 53 files, private 99 files (/home/user/trading/.sweep-output/nav-scale/results/k0)
+[11-23 18:39:42Z] NAV-SCALE k0 DONE. Next: sh dev/experiments/nav-scale-participation-2026-11-23/chain.sh publish 0 (trading-results), then commit results/k0/public into this repo.
