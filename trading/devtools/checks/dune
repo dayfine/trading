@@ -1649,3 +1649,31 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:weekly_picks_dry_run_check.sh})))
+
+; EODHD bar fixtures must not be tracked (#3676): they live in private
+; dayfine/trading-results. Reads live git state via repo_root(), so (universe).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:no_tracked_bars_check.sh})))
+
+; Pin no_tracked_bars_check.sh (#3701): clean tree OK, tracked bar FAIL, FAIL
+; under forced different ownership (CI's dubious-ownership mode), git error FAIL.
+; Throwaway git repo under mktemp; no (universe).
+
+(rule
+ (alias runtest)
+ (deps no_tracked_bars_check.sh _check_lib.sh)
+ (action
+  (run sh %{dep:no_tracked_bars_check_test.sh})))
+
+; Pin dev/scripts/fetch_test_bars.sh (#3701) against a throwaway local git repo
+; standing in for trading-results (no network). Script resolved at RUN TIME.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:fetch_test_bars_test.sh})))

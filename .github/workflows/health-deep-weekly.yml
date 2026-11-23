@@ -57,6 +57,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.BOT_GITHUB_TOKEN }}
 
+      - name: Fetch EODHD bar fixtures (private trading-results, #3676)
+        working-directory: ${{ github.workspace }}
+        env:
+          TRADING_RESULTS_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: sh dev/scripts/fetch_test_bars.sh
+
       # checkout configures safe.directory under a temporary HOME.
       - name: Trust the checkout for subsequent steps
         shell: bash

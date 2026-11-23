@@ -49,6 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch EODHD bar fixtures (private trading-results, #3676)
+        working-directory: ${{ github.workspace }}
+        env:
+          TRADING_RESULTS_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        run: sh dev/scripts/fetch_test_bars.sh
+
       # Cache _build/ between runs. dune is incremental: when the source +
       # dune files + opam dep set haven't changed, restoring _build turns
       # `dune build` into a near-instant no-op (was ~40s cold).
