@@ -15,7 +15,8 @@
 #      (CI passes the BOT_GITHUB_TOKEN secret here; fork PRs get no secrets)
 # Sources 1-2 extract the pinned commit with `git archive` when it is present in
 # that checkout (git -C <dir> pull to get it), else copy its working tree and
-# warn. Pin bumps: edit dev/test_bars.pin to the new trading-results commit.
+# warn. The fallback leaves .bars-pin unset so
+# the next run re-extracts once the pin is present. Pin bumps: edit dev/test_bars.pin to the new trading-results commit.
 #
 # Usage: sh dev/scripts/fetch_test_bars.sh [--force]
 #   Idempotent: skipped when trading/test_data/.bars-pin already names the pin.
@@ -26,6 +27,7 @@ set -eu
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 DEST="$HERE/trading/test_data"
 MARK="$DEST/.bars-pin"
+PINNED=1   # 0 when the working-tree fallback copied unpinned content
 PIN=$(sed -n 's/^\([0-9a-f]\{40\}\)[[:space:]]*$/\1/p' "$HERE/dev/test_bars.pin" | head -n 1)
 FORCE=0
 [ "${1:-}" = "--force" ] && FORCE=1
@@ -47,6 +49,7 @@ if [ -n "$SRC" ]; then
     git -C "$SRC" archive "$PIN" trading/test_data | tar -x -C "$HERE"
   else
     echo "WARN: pin $PIN not in $SRC (run: git -C $SRC pull); copying its working tree" >&2
+    PINNED=0
     [ -d "$SRC/trading/test_data" ] || die "$SRC has no trading/test_data"
     (cd "$SRC" && tar -c trading/test_data) | tar -x -C "$HERE"
   fi
@@ -67,5 +70,5 @@ fi
 
 n=$(find "$DEST" -name data.csv | wc -l | tr -d ' ')
 [ "$n" -gt 0 ] || die "extraction produced no data.csv under $DEST"
-echo "$PIN" >"$MARK"
+if [ "$PINNED" = 1 ]; then echo "$PIN" >"$MARK"; else rm -f "$MARK"; fi
 echo "fetch_test_bars: $n bar files in $DEST at $PIN"

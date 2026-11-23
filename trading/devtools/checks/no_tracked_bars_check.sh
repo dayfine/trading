@@ -14,8 +14,14 @@ set -e
 
 REPO_ROOT="$(repo_root)"
 
-FOUND=$(git -C "$REPO_ROOT" ls-files -- 'trading/test_data/*/data.csv' 'trading/test_data/*/data.metadata.sexp' |
-  grep -E '^trading/test_data/[A-Z]/.*/data(\.metadata\.sexp|\.csv)$' || true)
+# safe.directory: CI runs git as a user that does not own the checkout; without it
+# git errors out, and a swallowed error would read as "no offenders" (QC #3701).
+LS=$(git -C "$REPO_ROOT" -c safe.directory="$REPO_ROOT" ls-files -- 'trading/test_data/*/data.csv' 'trading/test_data/*/data.metadata.sexp' 2>&1) && GIT_CODE=0 || GIT_CODE=$?
+if [ "$GIT_CODE" -ne 0 ]; then
+  echo "FAIL: no-tracked-bars check -- git ls-files failed (rc=$GIT_CODE): $LS"
+  exit 1
+fi
+FOUND=$(printf '%s\n' "$LS" | grep -E '^trading/test_data/[A-Z]/.*/data(\.metadata\.sexp|\.csv)$' || true)
 
 if [ -n "$FOUND" ]; then
   echo "FAIL: no-tracked-bars check -- EODHD bar fixtures are tracked:"
