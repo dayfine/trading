@@ -23,7 +23,15 @@ configuration; nothing else is set.
 | Network access | default allowlist **plus `eodhd.com`** | without it the egress proxy refuses EODHD (`connect_rejected`, curl `http=000`) |
 
 What a session gets: a clone of `dayfine/trading`, `gh` authenticated as the
-owner, `dockerd`, and the image `ghcr.io/dayfine/trading-ci:latest`.
+owner, the `dockerd` binary, and the image `ghcr.io/dayfine/trading-ci:latest`.
+
+**The Docker daemon is not running when a session starts**: `/var/run/docker.sock` exists but nothing answers it.
+Every brief that runs Docker must tell the session to start it, in these words:
+`setsid nohup dockerd > /tmp/dockerd.log 2>&1 < /dev/null &`, wait ~10 s, then `docker info`. On 2026-11-24 three of five
+universe-depth sessions stopped at setup because the brief only said "run `docker info`, stop if it fails", and one
+session's own attempt to start the daemon was refused by the permission classifier. Sessions given the exact command started it.
+Sessions do not get `dayfine/trading-results`: add it with the session's `add_repo` tool (push access), then
+`git clone --depth 1`.
 
 What it does not get: `data/` (2.1 GB of bars), the snapshot warehouse
 (`/tmp/snap_top3000_pit_v*`), `.sweep-output/` artifacts, and the Weinstein book,
