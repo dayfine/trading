@@ -1,0 +1,9 @@
+check | pair | arm | verdict
+V6    |    2 |   1 | DIFFER
+
+specimens present in some reports but not all:
+  V6 CNR_old2 2017-12-22 (twin positions: CNR_old2/NCS) -- only in: pair
+  V6 CMD 2009-11-09 (twin positions: CMD/CMN) -- only in: pair
+  V6 CMBT 2019-05-16 (twin positions: CMBT/EURN) -- only in: arm
+FAIL: validator invariant counts differ -- these arms hold different instrument sets and their delta is not a paired read
+exit=1

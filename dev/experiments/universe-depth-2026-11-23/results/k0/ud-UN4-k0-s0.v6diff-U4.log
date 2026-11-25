@@ -1,0 +1,10 @@
+check | pair | arm | verdict
+V6    |    3 |   1 | DIFFER
+
+specimens present in some reports but not all:
+  V6 GLPG 2019-04-03 (twin positions: GLPG/LKFT) -- only in: pair
+  V6 CMD 2009-11-09 (twin positions: CMD/CMN) -- only in: pair
+  V6 KONA 2013-05-06 (twin positions: KONA/KONAQ) -- only in: pair
+  V6 CMBT 2019-05-16 (twin positions: CMBT/EURN) -- only in: arm
+FAIL: validator invariant counts differ -- these arms hold different instrument sets and their delta is not a paired read
+exit=1

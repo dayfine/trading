@@ -1,0 +1,80 @@
+[11-24 13:17:43Z] universe-depth run k3; SC_SHA=ca42b914644506b1a305f158fed4340f36387772 CELL_TIMEOUT=28000s
+[11-24 13:17:49Z] HEAD=ca42b9146 image=ghcr.io/dayfine/trading-ci:latest sha256:886851cbc0f1 mem=15G par=1
+[11-24 13:17:49Z] disk free 52G
+[11-24 13:17:49Z] SPEC CHECKS OK k3 (ud-*-k3 = ns-P-100k-k3 on pit-v13; U* top-4000 / universe_size 4000; N* + require_structural_stop false last)
+[11-24 13:17:49Z] BUILD
+[11-24 13:19:00Z] BUILD_DONE
+[11-24 13:19:00Z] disk free 51G
+[11-24 13:19:00Z] PULL warehouse v12wk-9236
+[11-24 13:23:22Z] PULL corpact corpact-2026-10-27
+[11-24 13:23:23Z] PULL bars data-20261102
+[11-24 13:23:47Z] TD v12: removed 0 dividends/splits files not in corpact-2026-10-27
+[11-24 13:23:47Z] STAGE OK v12: warehouse v12wk-9236 9236 entries, corpact corpact-2026-10-27, bars data-20261102, TD 11880 dividends.csv
+[11-24 13:23:47Z] RUN ns-P-100k-k0-s0 (stage v12)
+[11-24 15:04:46Z] RESULT ns-P-100k-k0-s0 => log_nav_ratio 2.5739 total_return_pct 1211.741347364356 max_drawdown_pct 39.552467904837961 peak_rss_kb=5750280 (wall 6059s)
+[11-24 15:04:46Z] TRIPWIRE MATCH ns-P-100k-k0-s0 trades.csv md5 f7746eb838618c9eac4aed7f969e63af (563 lines)
+[11-24 15:04:58Z] DROPPED stage v12 (/home/user/trading/.sweep-output/universe-depth/v12)
+[11-24 15:04:58Z] disk free 51G
+[11-24 15:04:58Z] PULL warehouse v13pit-12710
+[11-24 15:11:19Z] ABORT: pull-dir v13pit-12710
+[11-24 15:11:53Z] universe-depth run k3; SC_SHA=ca42b914644506b1a305f158fed4340f36387772 CELL_TIMEOUT=28000s
+[11-24 15:11:54Z] HEAD=ca42b9146 image=ghcr.io/dayfine/trading-ci:latest sha256:886851cbc0f1 mem=15G par=1
+[11-24 15:11:54Z] disk free 51G
+[11-24 15:11:54Z] SPEC CHECKS OK k3 (ud-*-k3 = ns-P-100k-k3 on pit-v13; U* top-4000 / universe_size 4000; N* + require_structural_stop false last)
+[11-24 15:11:54Z] BUILD
+[11-24 15:11:54Z] BUILD_DONE
+[11-24 15:11:54Z] SKIP tripwire (done)
+[11-24 15:11:54Z] disk free 51G
+[11-24 15:11:54Z] PULL warehouse v13pit-12710
+[11-24 15:18:31Z] PULL corpact corpact-2026-11-23
+[11-24 15:18:32Z] PULL bars data-20261123
+[11-24 15:19:00Z] TD v13: removed 0 dividends/splits files not in corpact-2026-11-23
+[11-24 15:19:00Z] STAGE OK v13: warehouse v13pit-12710 12710 entries, corpact corpact-2026-11-23, bars data-20261123, TD 16119 dividends.csv
+[11-24 15:19:00Z] PREFLIGHT ud-S3-k3 (to 2000-03-31)
+[11-24 15:22:43Z] ABSENT ud-S3-k3: 4 of 9694 loadable names not in the v13pit-12710 manifest (art/ud-S3-k3-absent.txt; quarantine: DNGFF HLAN MDFI SYNI )
+[11-24 15:22:43Z] PREFLIGHT_OK ud-S3-k3 (223s, initial_cash=100000.00, universe_size=9679, n_symbols=9694 absent=4)
+[11-24 15:22:43Z] PREFLIGHT ud-U4-k3 (to 2000-03-31)
+[11-24 15:27:18Z] ABSENT ud-U4-k3: 4 of 12345 loadable names not in the v13pit-12710 manifest (art/ud-U4-k3-absent.txt; quarantine: DNGFF HLAN MDFI SYNI )
+[11-24 15:27:18Z] PREFLIGHT_OK ud-U4-k3 (275s, initial_cash=100000.00, universe_size=12330, n_symbols=12345 absent=4)
+[11-24 15:27:18Z] PREFLIGHT ud-N3-k3 (to 2000-03-31)
+[11-24 15:31:07Z] ABSENT ud-N3-k3: 4 of 9694 loadable names not in the v13pit-12710 manifest (art/ud-N3-k3-absent.txt; quarantine: DNGFF HLAN MDFI SYNI )
+[11-24 15:31:07Z] PREFLIGHT_OK ud-N3-k3 (229s, initial_cash=100000.00, universe_size=9679, n_symbols=9694 absent=4)
+[11-24 15:31:07Z] PREFLIGHT ud-UN4-k3 (to 2000-03-31)
+[11-24 15:35:41Z] ABSENT ud-UN4-k3: 4 of 12345 loadable names not in the v13pit-12710 manifest (art/ud-UN4-k3-absent.txt; quarantine: DNGFF HLAN MDFI SYNI )
+[11-24 15:35:41Z] PREFLIGHT_OK ud-UN4-k3 (274s, initial_cash=100000.00, universe_size=12330, n_symbols=12345 absent=4)
+[11-24 15:35:41Z] CELLS k3: to run: S3 U4 N3 UN4 (PAR 1)
+[11-24 15:35:41Z] RUN ud-S3-k3-s0 (stage v13)
+[11-24 17:28:01Z] RESULT ud-S3-k3-s0 => log_nav_ratio 1.8888 total_return_pct 561.17368231519708 max_drawdown_pct 32.786038019853741 peak_rss_kb=6115696 (wall 6740s)
+[11-24 17:28:01Z] disk free 44G
+[11-24 17:28:01Z] RUN ud-U4-k3-s0 (stage v13)
+[11-25 05:05:06Z] universe-depth run k3; SC_SHA=ca42b914644506b1a305f158fed4340f36387772 CELL_TIMEOUT=28000s
+[11-25 05:05:09Z] HEAD=ca42b9146 image=ghcr.io/dayfine/trading-ci:latest sha256:886851cbc0f1 mem=15G par=1
+[11-25 05:05:09Z] disk free 44G
+[11-25 05:05:10Z] SPEC CHECKS OK k3 (ud-*-k3 = ns-P-100k-k3 on pit-v13; U* top-4000 / universe_size 4000; N* + require_structural_stop false last)
+[11-25 05:05:10Z] BUILD
+[11-25 05:05:42Z] BUILD_DONE
+[11-25 05:05:42Z] SKIP tripwire (done)
+[11-25 05:08:52Z] STAGE OK v13: warehouse v13pit-12710 12710 entries, corpact corpact-2026-11-23, bars data-20261123, TD 16119 dividends.csv
+[11-25 05:08:52Z] SKIP preflight ud-S3-k3 (done)
+[11-25 05:08:52Z] SKIP preflight ud-U4-k3 (done)
+[11-25 05:08:52Z] SKIP preflight ud-N3-k3 (done)
+[11-25 05:08:52Z] SKIP preflight ud-UN4-k3 (done)
+[11-25 05:08:52Z] CELLS k3: to run: U4 N3 UN4 (PAR 1)
+[11-25 05:08:52Z] RUN ud-U4-k3-s0 (stage v13)
+[11-25 07:36:11Z] RESULT ud-U4-k3-s0 => log_nav_ratio 2.3311 total_return_pct 928.91920818419555 max_drawdown_pct 36.061394393494531 peak_rss_kb=7337472 (wall 8839s)
+[11-25 07:36:11Z] disk free 44G
+[11-25 07:36:11Z] RUN ud-N3-k3-s0 (stage v13)
+[11-25 10:06:56Z] RESULT ud-N3-k3-s0 => log_nav_ratio 1.2470 total_return_pct 247.98928924991102 max_drawdown_pct 48.967674589008489 peak_rss_kb=6356904 (wall 9045s)
+[11-25 10:06:56Z] disk free 44G
+[11-25 10:06:56Z] RUN ud-UN4-k3-s0 (stage v13)
+[11-25 13:08:31Z] RESULT ud-UN4-k3-s0 => log_nav_ratio 0.4013 total_return_pct 49.375111794964553 max_drawdown_pct 52.7669886541417 peak_rss_kb=7629644 (wall 10895s)
+[11-25 13:08:31Z] disk free 44G
+[11-25 13:08:32Z] EXTRACT ud-S3-k3-s0: round_trips 585 band_1-3000 585 band_3001-4000 0 off-list 0 rt_Buffer_fallback 0 rt_Support_floor 585 | placed 698 placed_Buffer_fallback 0 (0.0%) | No_structural_stop skips 20595
+[11-25 13:08:33Z] EXTRACT ud-U4-k3-s0: round_trips 565 band_1-3000 432 band_3001-4000 133 off-list 0 rt_Buffer_fallback 0 rt_Support_floor 565 | placed 681 placed_Buffer_fallback 0 (0.0%) | No_structural_stop skips 20452
+[11-25 13:08:34Z] EXTRACT ud-N3-k3-s0: round_trips 756 band_1-3000 756 band_3001-4000 0 off-list 0 rt_Buffer_fallback 574 rt_Support_floor 182 | placed 1701 placed_Buffer_fallback 1461 (85.9%) | No_structural_stop skips 0
+[11-25 13:08:35Z] EXTRACT ud-UN4-k3-s0: round_trips 799 band_1-3000 596 band_3001-4000 203 off-list 0 rt_Buffer_fallback 628 rt_Support_floor 171 | placed 1813 placed_Buffer_fallback 1580 (87.1%) | No_structural_stop skips 0
+[11-25 13:08:36Z] PAIR k3 U4 vs S3: trades.csv differ; V6 exit=1
+[11-25 13:08:37Z] PAIR k3 N3 vs S3: trades.csv differ; V6 exit=1
+[11-25 13:08:37Z] PAIR k3 UN4 vs U4: trades.csv differ; V6 exit=1
+[11-25 13:08:37Z] LIVE k3 U4: 133 round trips in top-4000-not-top-3000 names of their decision year (PREREG: >= 10)
+[11-25 13:08:37Z] LIVE k3 N3: 1461 of 1701 placed entries Buffer_fallback = 85.9% (PREREG: >= 20 %)
