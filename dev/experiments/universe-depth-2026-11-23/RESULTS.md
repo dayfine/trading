@@ -1,6 +1,6 @@
 # Universe depth and the structural stop at live size: results (K=5)
 
-**Pre-registration.** `PREREG.md` (237b2bb8d228, #3707) and `PREREG-ADDENDUM.md` (376b2f5ab059, #3719, committed before any RESULT or PAIR line). Neither changed afterwards. The rule is applied as written.
+**Pre-registration.** `PREREG.md` (237b2bb8d228, #3707) and `PREREG-ADDENDUM.md` (376b2f5ab059, #3719, committed at 20:22Z on 11-24, after the S3 cells and the U4 k1/k2 cells had logged RESULT lines but before any result was read; it only makes PASS harder and none of its clauses were reached). Neither changed afterwards. The rule is applied as written.
 
 **Run.**
 - Kit ca42b9146445 (#3714); artifacts are `results/k0..k4/` (96b660385960, PR #3721).
@@ -417,11 +417,11 @@ Examples are PLZL (D3) and the stale-held OMM and BUDFF (D4).
 - UN4 − S3: −2.281 / −2.059 / −1.052 / −1.488 / −2.409 (median −2.059).
 - Main effects: U4 − S3 median +0.045; N3 − S3 median −1.091.
 - Interaction, (UN4 − N3) − (U4 − S3): −0.778 / −0.750 / −0.591 / −1.288 / −1.247. Negative on 5/5 seeds, median −0.778.
-- So depth is about neutral with structural stops, and costs about 0.85 log once the fallback door is open (UN4 − N3 median −0.846, 5/5 negative).
+- So depth is about neutral with structural stops, and is about 0.85 log worse once the fallback door is open (UN4 − N3 median −0.846, 5/5 negative; a shape from V6-failing pairs, not an effect estimate).
 
 **Which door the deep band uses.**
 - In U4, every deep-band round trip is Support_floor (127–136).
-- In UN4 the deep band has 191–216 round trips, of which 157–177 (79–84 %) are fallback.
+- In UN4 the deep band has 191–216 round trips, of which 157–177 (77–84 %) are fallback.
 - Only 24–34 of UN4's deep-band round trips match a U4 deep-band round trip on symbol and decision date.
 
 **What it displaces.** Both N arms are cash-bound on every buying Friday, so UN4's deep band replaces top-3000 round trips: UN4 has 580–634 of them against N3's 756–784.
@@ -475,7 +475,7 @@ Examples are PLZL (D3) and the stale-held OMM and BUDFF (D4).
 2. **Then rerun S3 and U4 only (10 cells).** This is the only read with an open question. Expect INCONCLUSIVE unless the true effect is about +0.3 log or more (power 0.68; 0.87 at +0.4). A finer answer needs more seeds under a new pre-registration.
 3. **Or rerun all 20 cells.** This completes the record, but no N3 or UN4 result can change a decision.
 4. **Or stop here.** Record INVALID with the shapes. The practical outcome matches the INCONCLUSIVE branch: picks stay on top-3000. Still do option 1 before v13 is used for a record re-baseline or for the weekly picks.
-5. **Cheap hardening, independent of the above.** An entry-time guard that treats rename twins like share classes (`Share_class_held` already fires 1–18 times per cell) would stop a missed list twin from being bought twice. It would be a flag-gated simulator change, not a substitute for repairing the lists.
+5. **Cheap hardening, independent of the above.** An entry-time guard that treats rename twins like share classes (`Share_class_held` already fires 0–18 times per cell) would stop a missed list twin from being bought twice. It would be a flag-gated simulator change, not a substitute for repairing the lists.
 6. **The fallback door.** Nothing follows (A4).
 
 ## 6. Defects found
