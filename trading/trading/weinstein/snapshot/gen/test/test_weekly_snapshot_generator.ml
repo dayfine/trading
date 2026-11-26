@@ -466,14 +466,24 @@ let test_sizing_uses_overlaid_stop_distance _ =
    classification, so the <=4-week early-breakout gate rightly rejects it — it is
    NOT a long candidate. Before the fix (prior_stage:None reset weeks_advancing
    to ~1) this stale advancer was wrongly surfaced as a fresh pick. See
-   [dev/notes/live-generator-prior-stage-bug-2026-07-01.md]. *)
+   [dev/notes/live-generator-prior-stage-bug-2026-07-01.md].
+
+   Pins the staleness gate alone, so virgin-crossing re-admission is off: the
+   synthetic AAPL trends into new highs, and the record config (re-admission
+   on) admits it through the virgin arm, in the report and the backtest alike
+   (test_stale_breakout_readmitted_like_backtest). *)
+let _stale_as_of = Date.of_string "2022-10-07"
+
+let _stale_inputs ~virgin_crossing_readmission =
+  let base =
+    _inputs_at ~as_of:_stale_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  { base with config = { base.config with virgin_crossing_readmission } }
+
 let test_stale_breakout_not_admitted _ =
   let snap =
-    Generator.generate
-      (_inputs_at
-         ~as_of:(Date.of_string "2022-10-07")
-         ~bar_reader:(_breakout_bar_reader ())
-         ~ticker_sectors:[ ("AAPL", "Information Technology") ])
+    Generator.generate (_stale_inputs ~virgin_crossing_readmission:false)
   in
   let aapl =
     List.find (snap : Weekly_snapshot.t).long_candidates
@@ -1994,27 +2004,31 @@ let _report_analysis ~bars config =
    builder ([Weinstein_strategy.stock_analysis_config_for]) and its panel
    callbacks over an adjusted-basis side-table, as an adjusted-basis warehouse
    run reads them. *)
-let _backtest_analysis ~bars (strategy_config : Weinstein_strategy.config) =
+let _backtest_analysis_on ~reader ~symbol ~bars ~as_of ~prior_stage
+    (strategy_config : Weinstein_strategy.config) =
   let config =
     Weinstein_strategy.stock_analysis_config_for ~config:strategy_config
   in
-  let reader = _tape_reader bars in
   let view symbol =
     Bar_reader.weekly_view_for reader ~symbol ~n:strategy_config.lookback_bars
-      ~as_of:_tape_as_of
+      ~as_of
   in
   let callbacks =
     Weinstein_strategy.Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ~snapshot_cb:(Bar_reader.snapshot_callbacks reader)
-      ~stock_symbol:_tape_symbol
+      ~stock_symbol:symbol
       ~weekly_sidetable:
         (Snapshot_pipeline.Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars)
       ~sketch_warehouse:true
       ~sidetable_basis:Weinstein_strategy.Weekly_sidetable_reader.Adjusted
-      ~config ~stock:(view _tape_symbol) ~benchmark:(view _index_symbol) ()
+      ~config ~stock:(view symbol) ~benchmark:(view _index_symbol) ()
   in
-  Stock_analysis.analyze_with_callbacks ~config ~ticker:_tape_symbol ~callbacks
-    ~prior_stage:None ~as_of_date:_tape_as_of
+  Stock_analysis.analyze_with_callbacks ~config ~ticker:symbol ~callbacks
+    ~prior_stage ~as_of_date:as_of
+
+let _backtest_analysis ~bars config =
+  _backtest_analysis_on ~reader:(_tape_reader bars) ~symbol:_tape_symbol ~bars
+    ~as_of:_tape_as_of ~prior_stage:None config
 
 let _supply_grade (a : Stock_analysis.t) =
   Option.map a.supply ~f:(fun (r : Resistance_supply.result) -> r.quality)
@@ -2099,9 +2113,56 @@ let test_report_record_config_readmits_like_backtest _ =
       (_backtest_analysis ~bars:_virgin_bars record).virgin_readmission )
     (pair (is_some_and (equal_to true)) (equal_to true))
 
+(* The backtest's analysis of the stale AAPL fixture: its bars up to the as-of
+   date, with the prior stage the report chained ([Stock_analysis.t.prior_stage],
+   the value the simulator carries from the previous Friday). *)
+let _stale_backtest_analysis ~prior_stage (config : Weinstein_strategy.config) =
+  let bars =
+    List.filter (_bars_for ~syn_config:_syn_config "AAPL")
+      ~f:(fun (b : Types.Daily_price.t) -> Date.( <= ) b.date _stale_as_of)
+  in
+  _backtest_analysis_on ~reader:(_breakout_bar_reader ()) ~symbol:"AAPL" ~bars
+    ~as_of:_stale_as_of ~prior_stage config
+
+(* The stale (w>4) AAPL breakout trends into new highs, so the record config
+   (virgin-crossing re-admission on) admits it through the virgin arm: in the
+   report's snapshot, and in the backtest path's breakout test on the same
+   prior stage. With re-admission off, the backtest rejects it as the report
+   does (test_stale_breakout_not_admitted): the virgin arm is what admits it on
+   both paths. *)
+let test_stale_breakout_readmitted_like_backtest _ =
+  let record = _stale_inputs ~virgin_crossing_readmission:true in
+  let report = Generator.analyze_ticker record "AAPL" in
+  let prior_stage =
+    Option.bind report ~f:(fun (a : Stock_analysis.t) -> a.prior_stage)
+  in
+  let backtest config =
+    Stock_analysis.is_breakout_candidate
+      (_stale_backtest_analysis ~prior_stage config)
+  in
+  let admitted (snap : Weekly_snapshot.t) =
+    List.exists snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+        String.equal c.symbol "AAPL")
+  in
+  assert_that
+    ( ( admitted (Generator.generate record),
+        Option.map report ~f:(fun (a : Stock_analysis.t) ->
+            a.virgin_readmission) ),
+      ( backtest record.config,
+        backtest
+          {
+            record.config with
+            Weinstein_strategy.virgin_crossing_readmission = false;
+          } ) )
+    (pair
+       (pair (equal_to true) (is_some_and (equal_to true)))
+       (pair (equal_to true) (equal_to false)))
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "stale breakout re-admitted by the record config like the backtest"
+         >:: test_stale_breakout_readmitted_like_backtest;
          "report threads virgin_crossing_readmission like the backtest"
          >:: test_report_threads_virgin_crossing_readmission;
          "record config re-admits through the report like the backtest"
