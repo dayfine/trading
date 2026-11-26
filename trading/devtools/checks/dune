@@ -1493,7 +1493,8 @@
  (action
   (run sh %{dep:deep_scan_verdict_parse_check.sh})))
 
-; #3266: every per-list rename-twin drop in pit-v12/twin-drops.txt still holds in the pit-v12 lists. Reads the
+; #3266, #3713: for every pit-vN vintage with a twin-drops.txt (pit-v12, pit-v13, ...), its own per-list
+; rename-twin drops still hold, and no pair an earlier vintage dropped has both legs in a same-year list. Reads the
 ; lists via repo_root() at RUN TIME, so (universe) is required (H-CHECK-CACHE-BLIND).
 
 (rule
