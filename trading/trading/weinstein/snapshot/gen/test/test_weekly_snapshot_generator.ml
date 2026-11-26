@@ -1935,79 +1935,86 @@ let test_report_threads_entry_anchors _ =
    520-week high 75 and grades it [Virgin_territory]; [One_basis] (the default)
    puts the breakout on the sketch's basis (50) and finds the ten weeks at the
    old high above it: [Heavy_resistance]. *)
-let _split_symbol = "SPLITS"
-let _split_first_friday = Date.of_string "2015-01-02"
-let _split_n_weeks = 110
+let _tape_symbol = "SPLITS"
+let _tape_first_friday = Date.of_string "2015-01-02"
+let _tape_n_weeks = 110
 
-let _split_raw_at off =
-  if off >= 100 then (150.0, 140.0, 145.0)
+(* Raw (high, low, close) by offset back from the as-of week (0 = newest): ten
+   weeks at [old_high] (100 to 109 weeks back, outside the 56-week weekly view
+   but inside the sketch), a decline, a base whose top (100, 30 weeks back) is
+   the breakout, then a recent advance that stays under it. *)
+let _tape_raw_at ~old_high off =
+  if off >= 100 then (old_high, old_high -. 10.0, old_high -. 5.0)
   else if off >= 52 then (90.0, 80.0, 85.0)
   else if off = 30 then (100.0, 88.0, 94.0)
   else if off >= 8 then (96.0, 88.0, 94.0)
   else if off > 0 then (98.0, 92.0, 96.0)
   else (98.0, 92.0, 98.0)
 
-(* One bar per week, each on a Friday: raw OHLC as traded, [adjusted_close]
-   half the raw close (the split lands after the as-of date). *)
-let _split_bars =
-  List.init _split_n_weeks ~f:(fun i ->
-      let high, low, close = _split_raw_at (_split_n_weeks - 1 - i) in
+(* One bar per week, each on a Friday: raw OHLC as traded, [adjusted_close] the
+   raw close times [factor] (a split after the as-of date when [factor < 1]). *)
+let _tape_bars ~old_high ~factor =
+  List.init _tape_n_weeks ~f:(fun i ->
+      let high, low, close = _tape_raw_at ~old_high (_tape_n_weeks - 1 - i) in
       Types.Daily_price.make
-        ~date:(Date.add_days _split_first_friday (7 * i))
+        ~date:(Date.add_days _tape_first_friday (7 * i))
         ~open_price:close ~high_price:high ~low_price:low ~close_price:close
-        ~volume:1_000_000 ~adjusted_close:(close *. 0.5) ())
+        ~volume:1_000_000 ~adjusted_close:(close *. factor) ())
 
-let _split_as_of = (List.last_exn _split_bars).date
+(* The record path's later-split tape (strategy test_virgin_supply_basis.ml):
+   old high 150, adjusted at half. *)
+let _split_bars = _tape_bars ~old_high:150.0 ~factor:0.5
 
-let _split_reader () =
-  Bar_reader.of_in_memory_bars
-    [ (_split_symbol, _split_bars); (_index_symbol, _split_bars) ]
+(* A split-free tape whose old high (95) sits under the breakout (100): the
+   breakout is into new high ground on either basis. *)
+let _virgin_bars = _tape_bars ~old_high:95.0 ~factor:1.0
+let _tape_as_of = (List.last_exn _split_bars).date
 
+let _tape_reader bars =
+  Bar_reader.of_in_memory_bars [ (_tape_symbol, bars); (_index_symbol, bars) ]
+
+(* The record config (the strategy default), on [basis]. *)
 let _basis_config basis =
   {
-    (Weinstein_strategy.default_config ~universe:[ _split_symbol ]
+    (Weinstein_strategy.default_config ~universe:[ _tape_symbol ]
        ~index_symbol:_index_symbol)
     with
     Weinstein_strategy.virgin_supply_basis = basis;
   }
 
 (* The report's verdict: the generator's own per-ticker analysis. *)
-let _report_analysis basis =
+let _report_analysis ~bars config =
   let base =
-    _inputs_at ~as_of:_split_as_of ~bar_reader:(_split_reader ())
-      ~ticker_sectors:[ (_split_symbol, "Industrials") ]
+    _inputs_at ~as_of:_tape_as_of ~bar_reader:(_tape_reader bars)
+      ~ticker_sectors:[ (_tape_symbol, "Industrials") ]
   in
-  Generator.analyze_ticker
-    { base with config = _basis_config basis }
-    _split_symbol
+  Generator.analyze_ticker { base with config } _tape_symbol
 
 (* The backtest's verdict on the same config and tape: the simulator's config
    builder ([Weinstein_strategy.stock_analysis_config_for]) and its panel
    callbacks over an adjusted-basis side-table, as an adjusted-basis warehouse
    run reads them. *)
-let _backtest_analysis basis =
-  let strategy_config = _basis_config basis in
+let _backtest_analysis ~bars (strategy_config : Weinstein_strategy.config) =
   let config =
     Weinstein_strategy.stock_analysis_config_for ~config:strategy_config
   in
-  let reader = _split_reader () in
+  let reader = _tape_reader bars in
   let view symbol =
     Bar_reader.weekly_view_for reader ~symbol ~n:strategy_config.lookback_bars
-      ~as_of:_split_as_of
+      ~as_of:_tape_as_of
   in
   let callbacks =
     Weinstein_strategy.Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ~snapshot_cb:(Bar_reader.snapshot_callbacks reader)
-      ~stock_symbol:_split_symbol
+      ~stock_symbol:_tape_symbol
       ~weekly_sidetable:
-        (Snapshot_pipeline.Weekly_sidetable_builder.of_bars ~deep_bars:[]
-           ~bars:_split_bars)
+        (Snapshot_pipeline.Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars)
       ~sketch_warehouse:true
       ~sidetable_basis:Weinstein_strategy.Weekly_sidetable_reader.Adjusted
-      ~config ~stock:(view _split_symbol) ~benchmark:(view _index_symbol) ()
+      ~config ~stock:(view _tape_symbol) ~benchmark:(view _index_symbol) ()
   in
-  Stock_analysis.analyze_with_callbacks ~config ~ticker:_split_symbol ~callbacks
-    ~prior_stage:None ~as_of_date:_split_as_of
+  Stock_analysis.analyze_with_callbacks ~config ~ticker:_tape_symbol ~callbacks
+    ~prior_stage:None ~as_of_date:_tape_as_of
 
 let _supply_grade (a : Stock_analysis.t) =
   Option.map a.supply ~f:(fun (r : Resistance_supply.result) -> r.quality)
@@ -2041,8 +2048,14 @@ let test_report_threads_virgin_supply_basis _ =
 let test_report_supply_grade_follows_basis_like_backtest _ =
   let legacy = Stock_analysis_supply.Legacy_mixed in
   let one = Stock_analysis_supply.One_basis in
-  let report basis = Option.bind (_report_analysis basis) ~f:_supply_grade in
-  let backtest basis = _supply_grade (_backtest_analysis basis) in
+  let report basis =
+    Option.bind
+      (_report_analysis ~bars:_split_bars (_basis_config basis))
+      ~f:_supply_grade
+  in
+  let backtest basis =
+    _supply_grade (_backtest_analysis ~bars:_split_bars (_basis_config basis))
+  in
   assert_that
     ((report legacy, backtest legacy), (report one, backtest one))
     (pair
@@ -2053,9 +2066,46 @@ let test_report_supply_grade_follows_basis_like_backtest _ =
           (is_some_and (equal_to Weinstein_types.Heavy_resistance))
           (is_some_and (equal_to Weinstein_types.Heavy_resistance))))
 
+(* R1: the report arms [virgin_crossing_readmission] from the strategy config,
+   as the backtest does: on at the record default, off when the config turns it
+   off. A severed copy in [stock_analysis_config] would leave the report on
+   [Stock_analysis.default_config]'s [false] whatever the config says. *)
+let test_report_threads_virgin_crossing_readmission _ =
+  let record = _basis_config Stock_analysis_supply.One_basis in
+  let flags (config : Weinstein_strategy.config) =
+    ( (Generator.stock_analysis_config config).virgin_crossing_readmission,
+      (Weinstein_strategy.stock_analysis_config_for ~config)
+        .virgin_crossing_readmission )
+  in
+  assert_that
+    ( flags record,
+      flags
+        { record with Weinstein_strategy.virgin_crossing_readmission = false }
+    )
+    (pair
+       (pair (equal_to true) (equal_to true))
+       (pair (equal_to false) (equal_to false)))
+
+(* EFFECTIVENESS-PIN: virgin_crossing_readmission -- weekly-report path: on a
+   tape whose breakout (100) clears every prior high in the sketch (old high
+   95), the record config re-admits the name as a virgin crossing through the
+   generator exactly as through the backtest path. Red when the generator drops
+   the flag (the report would read [false] while the backtest reads [true]). *)
+let test_report_record_config_readmits_like_backtest _ =
+  let record = _basis_config Stock_analysis_supply.One_basis in
+  assert_that
+    ( Option.map (_report_analysis ~bars:_virgin_bars record)
+        ~f:(fun (a : Stock_analysis.t) -> a.virgin_readmission),
+      (_backtest_analysis ~bars:_virgin_bars record).virgin_readmission )
+    (pair (is_some_and (equal_to true)) (equal_to true))
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "report threads virgin_crossing_readmission like the backtest"
+         >:: test_report_threads_virgin_crossing_readmission;
+         "record config re-admits through the report like the backtest"
+         >:: test_report_record_config_readmits_like_backtest;
          "report threads virgin_supply_basis like the backtest"
          >:: test_report_threads_virgin_supply_basis;
          "report supply grade follows the basis like the backtest"

@@ -128,8 +128,9 @@ type inputs = {
 val stock_analysis_config : Weinstein_strategy.config -> Stock_analysis.config
 (** [stock_analysis_config config] is the per-stock analysis config {!generate}
     screens with: {!Stock_analysis.default_config} with the strategy config's
-    ticket-level knobs threaded in. Those are [overhead_supply] and its price
-    basis [virgin_supply_basis] (#3664; both carry the strategy default, which
+    ticket-level knobs threaded in. Those are [overhead_supply], the
+    virgin-crossing re-admission [virgin_crossing_readmission] and their price
+    basis [virgin_supply_basis] (#3664; each carries the strategy default, which
     the report then shares with the backtest), the replace anchor
     [entry_anchor_local_range_weeks], the stale-entry cap
     [entry_cap_local_range_weeks] ({!Stale_entry_cap}) and the F1
