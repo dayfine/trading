@@ -115,13 +115,18 @@ self_test() {
   for r in inh ok; do printf 'top-4000-2009 X Y\n' > "$t/$r/pit-v2/twin-drops.txt"; done
   printf '((entries (((symbol Y) (weight 1))\n  ((symbol OLD) (weight 1)) ((symbol NEW) (weight 1)))))\n' > "$t/inh/pit-v2/composition/top-4000-2009.sexp"
   printf '((entries (((symbol Y) (weight 1)) ((symbol NEW) (weight 1)))))\n' > "$t/ok/pit-v2/composition/top-4000-2009.sexp"
-  rc=0
-  if check_root "$t/both" > /dev/null; then echo "FAIL: self-test: a list holding both legs passed"; rc=1; fi
-  if ! check_root "$t/one" > /dev/null; then echo "FAIL: self-test: a list holding only the survivor failed"; rc=1; fi
-  if check_root "$t/inh" > /dev/null; then echo "FAIL: self-test: an earlier vintage's twin back in a same-year list passed"; rc=1; fi
-  if ! check_root "$t/ok" > /dev/null; then echo "FAIL: self-test: a later vintage holding only the survivor failed"; rc=1; fi
+  # Each check_root runs in a subshell: it sets its own globals (rc, earlier), which must not reach st_rc (#3727 QC).
+  st_rc=0
+  if (check_root "$t/both") > /dev/null; then echo "FAIL: self-test: a list holding both legs passed"; st_rc=1; fi
+  if ! (check_root "$t/one") > /dev/null; then echo "FAIL: self-test: a list holding only the survivor failed"; st_rc=1; fi
+  # inh must fail for the cross-vintage reason, not an own-row one.
+  if inh=$(check_root "$t/inh"); then echo "FAIL: self-test: an earlier vintage's twin back in a same-year list passed"; st_rc=1; fi
+  if ! echo "$inh" | grep -q -F "FAIL: pit-v2: pit-v1 twin pairs are both back"; then
+    echo "FAIL: self-test: the inherited fixture did not fail on the cross-vintage test"; st_rc=1
+  fi
+  if ! (check_root "$t/ok") > /dev/null; then echo "FAIL: self-test: a later vintage holding only the survivor failed"; st_rc=1; fi
   rm -rf "$t"
-  return "$rc"
+  return "$st_rc"
 }
 
 self_test || exit 1
