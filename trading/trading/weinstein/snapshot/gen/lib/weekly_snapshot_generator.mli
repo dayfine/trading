@@ -127,14 +127,16 @@ type inputs = {
 
 val stock_analysis_config : Weinstein_strategy.config -> Stock_analysis.config
 (** [stock_analysis_config config] is the per-stock analysis config {!generate}
-    screens with: {!Stock_analysis.default_config} with the strategy config's
-    ticket-level knobs threaded in. Those are [overhead_supply], the replace
-    anchor [entry_anchor_local_range_weeks], the stale-entry cap
-    [entry_cap_local_range_weeks] ({!Stale_entry_cap}) and the F1
-    [entry_freshness_basis]. Each defaults to the no-op, so the weekly report
-    stays bit-identical when unarmed. It is the weekly-report counterpart of the
-    simulator's [Weinstein_strategy.stock_analysis_config_for] for these knobs.
-    Exposed so the threading is testable. *)
+    screens with: {!Report_analysis_config.of_strategy_config}, which lists the
+    strategy knobs it threads. Exposed so the threading is testable. *)
+
+val analyze_ticker : inputs -> string -> Stock_analysis.t option
+(** [analyze_ticker inputs ticker] is the per-stock analysis {!generate} screens
+    [ticker] on: its weekly bars from [inputs.bar_reader] as of [inputs.as_of],
+    benchmarked on the primary index, with the live resistance sketch from its
+    daily history, on {!stock_analysis_config}. [None] when the ticker has no
+    bars. Exposed so tests can compare the report's verdicts (e.g. the
+    overhead-supply grade) with the backtest path's. *)
 
 val generate : inputs -> Weekly_snapshot.t
 (** [generate inputs] runs the cascade and returns the assembled snapshot.
