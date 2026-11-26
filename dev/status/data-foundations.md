@@ -1,11 +1,21 @@
 # Status: data-foundations
 
-## Last updated: 2026-10-30
+## Last updated: 2026-11-25
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-11-25 — pit-v13 rename-twin repair + cross-vintage twin check (#3721 D1, #3713).**
+  `dev/experiments/v13-twin-repair-2026-11-25/repair.sh` re-applies the
+  pit-v12 drops whose legs were both back in a same-year v13 list (918 rows)
+  and the new pairs a whole-union v13 scan confirmed (1,107 rows; 163 pairs
+  v12 never named, evidence in `results/new-pairs.txt`), to both top-3000 and
+  top-4000; `pit-v13/twin-drops.txt` 15,592 → 17,617 rows; `composition.md5`
+  regenerated. `pit_twin_cooccur_check.sh` now loops over every `pit-vN`
+  vintage and also fails when an earlier vintage's pair has both legs in a
+  same-year list (fails on pre-repair v13 with 920 cells, passes after).
+  Verify: `sh trading/devtools/checks/pit_twin_cooccur_check.sh`.
 - [x] **2026-10-30 — monthly builder applies twin drops per window (#3388 follow-up).**
   `build_monthly_universe_warehouse.sh` `map_yearly_drops` now applies a
   `pit-v12/twin-drops.txt` `top-3000-Y` row only to the monthly lists dated in

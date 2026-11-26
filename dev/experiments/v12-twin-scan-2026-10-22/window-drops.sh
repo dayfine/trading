@@ -3,7 +3,7 @@
 #
 # Usage: sh window-drops.sh <scan-out-dir>    (reads twins.txt + cooccur.txt there; writes windows.txt + drops.txt)
 #   env DATA (bar store), EXCLUDE (pairs file of known non-twins, "A B" per line, default exclude-pairs.txt beside
-#   this script).
+#   this script), LAST_YEAR (the newest list year, whose window is open-ended; default 2025, pit-v12; pit-v13 is 2026).
 #
 # A held twin needs both legs in the SAME list and the same bars while that list governs. The whole-history run
 # criterion (twin-scan.sh) finds every pair that was one instrument for >= 250 days at SOME point; many such pairs are
@@ -30,6 +30,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 DATA=${DATA:-/Users/difan/Projects/trading-1/data}
 EXCLUDE=${EXCLUDE:-$HERE/exclude-pairs.txt}
 MIN_MOVING=20; MATCH=0.95; MIN_WRUN=60; RET_EPS=1e-3
+LAST_YEAR=${LAST_YEAR:-2025}
 
 csv_of() {
   f=$(printf %s "$1" | cut -c1)
@@ -68,7 +69,7 @@ while IFS=: read -r pair lists; do
   for L in $lists; do
     [ "$L" = none ] && continue
     y=$(echo "$L" | sed 's/.*-//')
-    lo="$y-05-31"; hi="$((y + 1))-05-31"; [ "$y" = 2025 ] && hi=9999
+    lo="$y-05-31"; hi="$((y + 1))-05-31"; [ "$y" = "$LAST_YEAR" ] && hi=9999
     st=$(window_stats "$d" "$s" "$lo" "$hi")
     if excluded "$d" "$s"; then dec=keep-excluded
     else dec=$(echo "$st" | awk -v mm="$MIN_MOVING" -v mf="$MATCH" -v mr="$MIN_WRUN" '{ split($2, m, "="); split($3, v, "="); split($4, r, "="); print (v[2] + 0 >= mm && (m[2] + 0 >= mf || r[2] + 0 >= mr)) ? "drop" : "keep" }')
