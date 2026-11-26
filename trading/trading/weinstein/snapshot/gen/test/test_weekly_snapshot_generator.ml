@@ -1926,9 +1926,140 @@ let test_report_threads_entry_anchors _ =
     (built.entry_cap_local_range_weeks, built.entry_anchor_local_range_weeks)
     (pair (equal_to 4) (equal_to 26))
 
+(* Weekly-report seam for [virgin_supply_basis] (#3664): the price basis of the
+   overhead-supply grade. The fixture is the record path's later-split tape
+   (strategy test_virgin_supply_basis.ml): raw 10-year high 150 (100 to 109
+   weeks back), raw base top / breakout 100 (30 weeks back), raw as-of close 98,
+   and a 2-for-1 split after the as-of date, so every adjusted price is half the
+   raw one. [Legacy_mixed] compares the raw breakout 100 with the adjusted
+   520-week high 75 and grades it [Virgin_territory]; [One_basis] (the default)
+   puts the breakout on the sketch's basis (50) and finds the ten weeks at the
+   old high above it: [Heavy_resistance]. *)
+let _split_symbol = "SPLITS"
+let _split_first_friday = Date.of_string "2015-01-02"
+let _split_n_weeks = 110
+
+let _split_raw_at off =
+  if off >= 100 then (150.0, 140.0, 145.0)
+  else if off >= 52 then (90.0, 80.0, 85.0)
+  else if off = 30 then (100.0, 88.0, 94.0)
+  else if off >= 8 then (96.0, 88.0, 94.0)
+  else if off > 0 then (98.0, 92.0, 96.0)
+  else (98.0, 92.0, 98.0)
+
+(* One bar per week, each on a Friday: raw OHLC as traded, [adjusted_close]
+   half the raw close (the split lands after the as-of date). *)
+let _split_bars =
+  List.init _split_n_weeks ~f:(fun i ->
+      let high, low, close = _split_raw_at (_split_n_weeks - 1 - i) in
+      Types.Daily_price.make
+        ~date:(Date.add_days _split_first_friday (7 * i))
+        ~open_price:close ~high_price:high ~low_price:low ~close_price:close
+        ~volume:1_000_000 ~adjusted_close:(close *. 0.5) ())
+
+let _split_as_of = (List.last_exn _split_bars).date
+
+let _split_reader () =
+  Bar_reader.of_in_memory_bars
+    [ (_split_symbol, _split_bars); (_index_symbol, _split_bars) ]
+
+let _basis_config basis =
+  {
+    (Weinstein_strategy.default_config ~universe:[ _split_symbol ]
+       ~index_symbol:_index_symbol)
+    with
+    Weinstein_strategy.virgin_supply_basis = basis;
+  }
+
+(* The report's verdict: the generator's own per-ticker analysis. *)
+let _report_analysis basis =
+  let base =
+    _inputs_at ~as_of:_split_as_of ~bar_reader:(_split_reader ())
+      ~ticker_sectors:[ (_split_symbol, "Industrials") ]
+  in
+  Generator.analyze_ticker
+    { base with config = _basis_config basis }
+    _split_symbol
+
+(* The backtest's verdict on the same config and tape: the simulator's config
+   builder ([Weinstein_strategy.stock_analysis_config_for]) and its panel
+   callbacks over an adjusted-basis side-table, as an adjusted-basis warehouse
+   run reads them. *)
+let _backtest_analysis basis =
+  let strategy_config = _basis_config basis in
+  let config =
+    Weinstein_strategy.stock_analysis_config_for ~config:strategy_config
+  in
+  let reader = _split_reader () in
+  let view symbol =
+    Bar_reader.weekly_view_for reader ~symbol ~n:strategy_config.lookback_bars
+      ~as_of:_split_as_of
+  in
+  let callbacks =
+    Weinstein_strategy.Panel_callbacks.stock_analysis_callbacks_of_weekly_views
+      ~snapshot_cb:(Bar_reader.snapshot_callbacks reader)
+      ~stock_symbol:_split_symbol
+      ~weekly_sidetable:
+        (Snapshot_pipeline.Weekly_sidetable_builder.of_bars ~deep_bars:[]
+           ~bars:_split_bars)
+      ~sketch_warehouse:true
+      ~sidetable_basis:Weinstein_strategy.Weekly_sidetable_reader.Adjusted
+      ~config ~stock:(view _split_symbol) ~benchmark:(view _index_symbol) ()
+  in
+  Stock_analysis.analyze_with_callbacks ~config ~ticker:_split_symbol ~callbacks
+    ~prior_stage:None ~as_of_date:_split_as_of
+
+let _supply_grade (a : Stock_analysis.t) =
+  Option.map a.supply ~f:(fun (r : Resistance_supply.result) -> r.quality)
+
+(* R1: the report screens on the strategy config's basis, as the backtest does,
+   for both settings. A severed copy in [stock_analysis_config] would leave the
+   report on [Stock_analysis.default_config]'s basis whatever the config says. *)
+let test_report_threads_virgin_supply_basis _ =
+  let bases basis =
+    ( (Generator.stock_analysis_config (_basis_config basis)).virgin_supply_basis,
+      (Weinstein_strategy.stock_analysis_config_for
+         ~config:(_basis_config basis))
+        .virgin_supply_basis )
+  in
+  assert_that
+    ( bases Stock_analysis_supply.Legacy_mixed,
+      bases Stock_analysis_supply.One_basis )
+    (pair
+       (pair
+          (equal_to Stock_analysis_supply.Legacy_mixed)
+          (equal_to Stock_analysis_supply.Legacy_mixed))
+       (pair
+          (equal_to Stock_analysis_supply.One_basis)
+          (equal_to Stock_analysis_supply.One_basis)))
+
+(* EFFECTIVENESS-PIN: virgin_supply_basis -- weekly-report path: on the
+   later-split tape the non-default [Legacy_mixed] moves the report's supply
+   grade off the default's [Heavy_resistance] to [Virgin_territory], and on each
+   basis the report's grade equals the backtest path's. Red when the generator
+   drops the basis (both report grades would read [Heavy_resistance]). *)
+let test_report_supply_grade_follows_basis_like_backtest _ =
+  let legacy = Stock_analysis_supply.Legacy_mixed in
+  let one = Stock_analysis_supply.One_basis in
+  let report basis = Option.bind (_report_analysis basis) ~f:_supply_grade in
+  let backtest basis = _supply_grade (_backtest_analysis basis) in
+  assert_that
+    ((report legacy, backtest legacy), (report one, backtest one))
+    (pair
+       (pair
+          (is_some_and (equal_to Weinstein_types.Virgin_territory))
+          (is_some_and (equal_to Weinstein_types.Virgin_territory)))
+       (pair
+          (is_some_and (equal_to Weinstein_types.Heavy_resistance))
+          (is_some_and (equal_to Weinstein_types.Heavy_resistance))))
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "report threads virgin_supply_basis like the backtest"
+         >:: test_report_threads_virgin_supply_basis;
+         "report supply grade follows the basis like the backtest"
+         >:: test_report_supply_grade_follows_basis_like_backtest;
          "long candidate carries score components"
          >:: test_long_candidate_carries_score_components;
          "eligible beyond cap positive when cap bites"

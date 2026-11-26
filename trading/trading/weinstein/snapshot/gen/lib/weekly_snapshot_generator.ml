@@ -129,6 +129,7 @@ let stock_analysis_config (config : Weinstein_strategy.config) =
   {
     Stock_analysis.default_config with
     overhead_supply = config.overhead_supply;
+    virgin_supply_basis = config.virgin_supply_basis;
     entry_anchor_local_range_weeks = config.entry_anchor_local_range_weeks;
     entry_cap_local_range_weeks = config.entry_cap_local_range_weeks;
     entry_freshness_basis = config.entry_freshness_basis;
@@ -142,6 +143,12 @@ let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
   let analysis_config = stock_analysis_config inputs.config in
   List.filter_map eligible_tickers ~f:(fun ticker ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
+
+let analyze_ticker (inputs : inputs) ticker =
+  _analyze_ticker ~inputs
+    ~analysis_config:(stock_analysis_config inputs.config)
+    ~index_bars:(_weekly_bars ~inputs inputs.config.indices.primary)
+    ticker
 
 (* Sparse-tail eligibility gate (issue #2083 fix 1, data hygiene not a Weinstein
    rule): the eligible tickers plus one warning line per dropped one. Disabled by
