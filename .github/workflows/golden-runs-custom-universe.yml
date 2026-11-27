@@ -92,7 +92,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: trading/_build
-          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          key: dune-${{ runner.os }}-${{ hashFiles('.devcontainer/pin_matchers.sh', 'trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
 
       - name: Run custom-universe golden postsubmit
         id: golden_custom_universe

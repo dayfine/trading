@@ -71,7 +71,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: trading/_build
-          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          key: dune-${{ runner.os }}-${{ hashFiles('.devcontainer/pin_matchers.sh', 'trading/**/*.opam', 'trading/**/dune', 'trading/**/dune-project', 'trading/**/*.ml', 'trading/**/*.mli') }}
 
       - name: Run tier-1 perf smoke
         id: tier1
