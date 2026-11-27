@@ -2,6 +2,7 @@ open Core
 open Async
 open OUnit2
 open Matchers
+open Status_matchers
 module Lib = Fetch_corporate_actions_lib
 module CA = Corporate_actions
 

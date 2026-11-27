@@ -7,6 +7,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Trading_simulation.Simulator
 open Test_helpers
 module Cash_yield = Trading_simulation_cash_yield.Cash_yield

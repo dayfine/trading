@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Eodhd_delisted_audit_lib
 
 let _eodhd_fixture_path = "./data/eodhd_delisted_fixture.json"

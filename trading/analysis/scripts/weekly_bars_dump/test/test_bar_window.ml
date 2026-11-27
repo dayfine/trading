@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Bar_window = Weekly_bars_dump_lib.Bar_window
 
 let _bar ~date ~close : Types.Daily_price.t =

@@ -15,10 +15,18 @@
   csv
   file.sexp
   core_unix
-  matchers)
+  matchers
+  status_matchers)
  (preprocess
   (pps ppx_sexp_conv)))
 
 (test
  (name test_synthetic_source)
- (libraries weinstein_data_source_testing core async ounit2 types matchers))
+ (libraries
+  weinstein_data_source_testing
+  core
+  async
+  ounit2
+  types
+  matchers
+  status_matchers))

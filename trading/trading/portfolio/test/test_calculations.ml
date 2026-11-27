@@ -4,6 +4,7 @@ open Trading_base.Types
 open Trading_portfolio.Types
 open Trading_portfolio.Calculations
 open Matchers
+open Status_matchers
 
 (* Test data builders - simple record constructors *)
 let make_trade ~id ~order_id ~symbol ~side ~quantity ~price ?(commission = 0.0)

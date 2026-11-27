@@ -2,6 +2,7 @@ open Core
 open Async
 open OUnit2
 open Matchers
+open Status_matchers
 open Eodhd.Http_client
 
 (* data from /trading/analysis/data/sources/eodhd/test/data/get_historical_price.json *)

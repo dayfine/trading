@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Weinstein_strategy
 module Config = Weinstein_strategy_config
 module Margin_config = Trading_portfolio.Margin_config

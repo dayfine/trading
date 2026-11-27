@@ -54,6 +54,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pin dayfine/matchers before the published image carries it (see ci.yml).
+      - name: Pin dayfine/matchers packages
+        working-directory: ${{ github.workspace }}
+        run: |
+          eval "$(opam env)"
+          sh .devcontainer/pin_matchers.sh
+
       - name: Fetch EODHD bar fixtures (private trading-results, #3676)
         working-directory: ${{ github.workspace }}
         env:

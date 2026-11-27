@@ -15,6 +15,7 @@
   core_unix.filename_unix
   core_unix.sys_unix
   matchers
+  status_matchers
   status
   tuner
   tuner_bin

@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Ishares.Ishares_holdings_client
 
 (* Pinned fixtures truncated from the iShares Russell 3000 holdings CSV.

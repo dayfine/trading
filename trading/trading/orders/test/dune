@@ -1,10 +1,10 @@
 (test
  (name test_create_order)
- (libraries ounit2 trading.orders trading.base matchers))
+ (libraries ounit2 trading.orders trading.base matchers status_matchers))
 
 (test
  (name test_manager)
- (libraries ounit2 trading.orders trading.base matchers))
+ (libraries ounit2 trading.orders trading.base matchers status_matchers))
 
 (test
  (name test_types)
@@ -13,4 +13,4 @@
 (test
  (name test_types_sexp)
  (modules test_types_sexp)
- (libraries ounit2 trading.orders trading.base matchers))
+ (libraries ounit2 trading.orders trading.base matchers status_matchers))

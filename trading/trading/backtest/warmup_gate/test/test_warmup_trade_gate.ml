@@ -14,6 +14,7 @@ open OUnit2
 open Core
 open Trading_strategy
 open Matchers
+open Status_matchers
 
 let start_date = Date.of_string "2010-01-01"
 let before = Date.of_string "2009-06-26" (* in the warmup window *)

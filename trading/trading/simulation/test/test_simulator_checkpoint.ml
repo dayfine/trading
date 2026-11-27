@@ -19,6 +19,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Test_helpers
 module Simulator = Trading_simulation.Simulator
 module Simulator_checkpoint = Trading_simulation.Simulator_checkpoint

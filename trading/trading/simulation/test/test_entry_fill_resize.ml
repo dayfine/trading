@@ -28,6 +28,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Entry_fill_resize = Trading_simulation.Entry_fill_resize
 module Entry_fill_retry = Trading_simulation.Entry_fill_retry
 module Cancel_handler = Trading_simulation.Cancel_handler

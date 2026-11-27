@@ -9,6 +9,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Weinstein_snapshot
 module Bar_reader = Weinstein_strategy.Bar_reader
 module Generator = Weinstein_snapshot_gen.Weekly_snapshot_generator

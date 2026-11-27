@@ -125,7 +125,8 @@
   weinstein.data_source
   async
   ounit2
-  matchers)
+  matchers
+  status_matchers)
  ; test_ad_bars_fixture reads the committed breadth fixture (issue #3238).
  (deps
   (glob_files %{workspace_root}/test_data/breadth/*.csv))

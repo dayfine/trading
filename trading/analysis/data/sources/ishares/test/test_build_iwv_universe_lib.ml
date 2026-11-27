@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Lib = Build_iwv_universe_lib
 module Client = Ishares.Ishares_holdings_client
 module Replay = Ishares.Ishares_membership_replay

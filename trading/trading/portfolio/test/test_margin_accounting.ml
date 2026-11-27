@@ -17,6 +17,7 @@ open Trading_portfolio.Portfolio
 open Trading_portfolio.Portfolio_margin
 module Margin_config = Trading_portfolio.Margin_config
 open Matchers
+open Status_matchers
 
 (* Test data builder — mirrors the one in test_portfolio.ml. Kept inline
    per .claude/rules/test-patterns.md (simple constructors stay in test

@@ -4,6 +4,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Test_helpers
 module BC = Backtest.Backtest_checkpoint
 module Sim = Trading_simulation.Simulator

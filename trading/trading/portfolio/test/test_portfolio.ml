@@ -5,6 +5,7 @@ open Trading_portfolio.Types
 open Trading_portfolio.Portfolio
 open Trading_portfolio.Calculations
 open Matchers
+open Status_matchers
 
 (* Domain-specific helper using matchers library *)
 let apply_trades_exn portfolio trades ~error_msg =

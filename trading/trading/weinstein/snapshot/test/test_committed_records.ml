@@ -28,6 +28,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Weinstein_snapshot
 
 let _committed_790d_path = "fixtures/picks/790d23a06-2026-07-24.sexp"

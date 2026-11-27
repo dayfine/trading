@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Weinstein_trading_state
 open Weinstein_types
 

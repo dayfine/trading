@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Resistance_sketch = Snapshot_pipeline.Resistance_sketch
 module Weekly_prefix = Snapshot_pipeline.Weekly_prefix
 module Pipeline = Snapshot_pipeline.Pipeline

@@ -16,6 +16,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Reader = Weinstein_strategy.Weekly_sidetable_reader
 module Resistance_sketch = Snapshot_pipeline.Resistance_sketch
 module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder

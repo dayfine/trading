@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Wiki_sp500.Changes_parser
 
 (* Pinned snapshot of [<table id="changes">] from

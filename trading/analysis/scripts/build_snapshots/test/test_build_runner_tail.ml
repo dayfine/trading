@@ -5,6 +5,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Series_tail = Snapshot_pipeline.Series_tail
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable

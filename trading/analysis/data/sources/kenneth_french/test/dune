@@ -1,5 +1,5 @@
 (tests
  (names test_kenneth_french_client)
- (libraries kenneth_french core ounit2 matchers status uri)
+ (libraries kenneth_french core ounit2 matchers status_matchers status uri)
  (deps
   (glob_files ./data/*.csv)))

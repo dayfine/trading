@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Bar_source = Weekly_bars_dump_lib.Bar_source
 module Pipeline = Snapshot_pipeline.Pipeline
 module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder

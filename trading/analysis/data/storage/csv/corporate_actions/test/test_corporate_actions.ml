@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module CA = Corporate_actions
 
 let _fresh_dir () =

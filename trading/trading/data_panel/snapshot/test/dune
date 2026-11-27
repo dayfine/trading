@@ -11,6 +11,7 @@
   core_unix
   core_unix.filename_unix
   matchers
+  status_matchers
   ounit2
   status
   trading.data_panel.snapshot))

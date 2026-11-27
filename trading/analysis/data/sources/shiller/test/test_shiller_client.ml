@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Shiller.Shiller_client
 
 (* The pinned sample fixture covers four distinct eras of the Shiller series:

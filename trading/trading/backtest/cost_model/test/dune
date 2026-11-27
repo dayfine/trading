@@ -5,6 +5,7 @@
   core
   core_unix.time_ns_unix
   matchers
+  status_matchers
   trading.base
   trading.engine
   backtest_cost_model))

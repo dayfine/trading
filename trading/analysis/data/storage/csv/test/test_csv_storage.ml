@@ -3,6 +3,7 @@ open Bos
 open Core
 open Csv.Csv_storage
 open Matchers
+open Status_matchers
 open Status
 
 let ok_or_failwith_status = function

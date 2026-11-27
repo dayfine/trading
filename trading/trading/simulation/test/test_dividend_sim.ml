@@ -16,6 +16,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Trading_simulation.Simulator
 open Test_helpers
 module Dividend_crediting = Trading_simulation_dividends.Dividend_crediting

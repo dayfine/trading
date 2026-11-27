@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier

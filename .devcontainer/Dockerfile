@@ -110,6 +110,16 @@ COPY --chown=opam:opam trading/ /workspaces/trading-1/trading/
 RUN opam repository set-url default https://opam.ocaml.org && opam update
 
 # -----------------------------------------------------------------------------
+# dayfine/matchers — status, matchers, status_matchers and ppx_test_matcher,
+# pinned at one commit by .devcontainer/pin_matchers.sh (they used to live
+# in-tree under trading/base and trading/devtools). Installed before the deps
+# loop below so every later layer resolves them. ci.yml runs the same script,
+# so a PR that bumps the commit is tested before this image is rebuilt.
+# -----------------------------------------------------------------------------
+COPY .devcontainer/pin_matchers.sh /tmp/pin_matchers.sh
+RUN sh /tmp/pin_matchers.sh && rm /tmp/pin_matchers.sh
+
+# -----------------------------------------------------------------------------
 # owl portable SIMD flags (issue #1955)
 # -----------------------------------------------------------------------------
 # owl's configure defaults to -march=native on x86_64 (owl.1.2

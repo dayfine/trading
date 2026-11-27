@@ -4,6 +4,7 @@
   bos
   csv
   matchers
+  status_matchers
   ounit2
   status
   storage.interface
@@ -17,4 +18,4 @@
 
 (test
  (name test_symbol_shard)
- (libraries ounit2 csv fpath matchers))
+ (libraries ounit2 csv fpath matchers status_matchers))

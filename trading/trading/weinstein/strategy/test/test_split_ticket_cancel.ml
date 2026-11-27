@@ -22,6 +22,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Split_ticket_cancel = Weinstein_strategy.Split_ticket_cancel
 module Entry_freeze = Weinstein_strategy.Entry_freeze
 module Bar_reader = Weinstein_strategy.Bar_reader

@@ -23,6 +23,7 @@
   core_unix.filename_unix
   ounit2
   matchers
+  status_matchers
   types)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq))
