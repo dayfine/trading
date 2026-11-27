@@ -160,7 +160,7 @@ jobs:
 
       - name: Fetch EODHD bar fixtures (private trading-results, #3676)
         env:
-          TRADING_RESULTS_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          TRADING_RESULTS_TOKEN: ${{ secrets.TRADING_RESULTS_READ_TOKEN || secrets.BOT_GITHUB_TOKEN }}
         run: sh dev/scripts/fetch_test_bars.sh
 
       - name: Compute today's date
