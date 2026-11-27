@@ -29,7 +29,7 @@ awk -v v12f="$TMP/v12.txt" -v delf="$TMP/delisted.txt" -v twf="$SCANOUT/twins.tx
     while ((getline l < twf) > 0) { split(l, f, " "); ev[f[1] " " f[2]] = substr(l, length(f[1] f[2]) + 3) }
     while ((getline l < v12d) > 0) if (l !~ /^#/) { split(l, f, " "); v12p[f[2] " " f[3]] = 1; if (f[4] ~ /^via=/) v12p[f[2] " " substr(f[4], 5)] = 1 }
   }
-  $NF == "src=scan" { s = ($4 ~ /^via=/) ? substr($4, 5) : $3; if (($2 " " s) in v12p || (s " " $2) in v12p) next; k = $2 " " s; n[k]++; if (!(k in seen)) { seen[k] = 1; order[++m] = k } }
+  $NF ~ /^src=scan/ { s = ($4 ~ /^via=/) ? substr($4, 5) : $3; if (($2 " " s) in v12p || (s " " $2) in v12p) next; k = ($NF ~ /,nest$/) ? s " " $2 : $2 " " s; n[k]++; if (!(k in seen)) { seen[k] = 1; order[++m] = k } }
   END {
     for (i = 1; i <= m; i++) {
       k = order[i]; split(k, p, " "); nl = ""

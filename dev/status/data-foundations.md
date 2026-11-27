@@ -6,6 +6,14 @@
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-11-26 — pit-v13 lists re-nested; nesting check (#3732 QC on #3727).**
+  `repair.sh` gains a nesting step: a top-4000-Y twin cell whose dropped leg
+  stays in top-3000-Y keeps that leg instead (72 rows flipped), so every
+  top-3000-Y is inside top-4000-Y again (71 name-years were not). top-3000
+  lists unchanged; `composition.md5` `140ae53e…`; U4 schedule union 12,221.
+  `pit_twin_cooccur_check.sh` checks nesting from pit-v13 on. Finding, not
+  fixed: the true-dollar basis mis-scales files whose volume is restated
+  for some splits only (twin ADVs differ by split factors; README).
 - [x] **2026-11-26 — split-corpus bars private + md5-checked bar fetch (#3676, after #3701).**
   The 10 EODHD `trading/test_data/split_corpus/<case>/bars.csv` moved to
   dayfine/trading-results (commit 7594576, now `dev/test_bars.pin`) with

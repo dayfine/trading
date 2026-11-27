@@ -18,14 +18,20 @@
 #                   year's window, so a rebuilt list holding both legs is the same double hold. This is the class the
 #                   own-rows test cannot see: a list rebuild that re-admits a twin its predecessor dropped and writes
 #                   no row for it (universe-depth K=5, #3721: 439 v12 rows had both legs back in the v13 lists).
+#   nesting         (pit-v13 on) within one year, every top-N list is inside every larger top-M list: FAIL when a
+#                   top-3000-Y name is missing from top-4000-Y. A twin repair that drops a leg from top-4000 but keeps
+#                   it in top-3000 breaks this (#3732 QC: 71 name-years after #3727), and then the deep arm is not the
+#                   shallow arm plus ranks 3001-4000.
 #
 # A self-test runs first on a temporary fixture (both legs FAIL, survivor only passes, an earlier vintage's pair back in
-# a same-year list of another family FAILs), so the check cannot rot into a no-op.
+# a same-year list of another family FAILs, a top-3000 name missing from top-4000 FAILs), so the check cannot rot into
+# a no-op.
 #
 # The lists live outside the dune sandbox's dependency set, so they are read via repo_root() at RUN TIME and the dune
 # rule needs (universe) (H-CHECK-CACHE-BLIND).
 #
-# Env override (tests): TWIN_PIT_ROOT, the dir holding the pit-vN dirs.
+# Env overrides (tests): TWIN_PIT_ROOT, the dir holding the pit-vN dirs; TWIN_NEST_FROM, the first vintage whose
+# nesting is checked (default 13).
 set -eu
 
 . "$(dirname "$0")/_check_lib.sh"
@@ -77,7 +83,25 @@ vintages() {
   done | sort -n | awk '{ print $2 }'
 }
 
+# $1 membership file. Nesting: within one year, every top-N list is inside every top-M list with M > N (top-3000-Y in
+# top-4000-Y). Prints one line per (list, symbol) missing from a larger list; returns 1 when any.
+scan_nesting() {
+  awk '{ n = split($1, p, "-"); if (n != 3 || p[1] != "top") next
+         r[++k] = $1 " " $2; m[$1 " " $2] = 1; if (!seen[$1]++) by[p[3]] = by[p[3]] " " $1 }
+       END {
+         for (i = 1; i <= k; i++) {
+           split(r[i], a, " "); split(a[1], p, "-"); c = split(by[p[3]], ls, " ")
+           for (j = 1; j <= c; j++) {
+             split(ls[j], q, "-")
+             if (q[2] + 0 > p[2] + 0 && !((ls[j] " " a[2]) in m)) { print "  " a[1] ": " a[2] " is not in " ls[j]; bad = 1 }
+           }
+         }
+         exit bad
+       }' "$1"
+}
+
 # $1 pit root. Checks every vintage; prints OK / violation lines; returns 1 when any vintage fails.
+# Nesting is checked from vintage $NEST_FROM on.
 check_root() {
   rc=0; earlier=""; mem=$(mktemp)
   for d in $(vintages "$1"); do
@@ -96,6 +120,14 @@ check_root() {
         echo "  $(echo "$out" | wc -l | tr -d ' ') (list, pair) cells"; rc=1
       fi
     done
+    if [ "${d##*/pit-v}" -ge "$NEST_FROM" ]; then
+      if out=$(scan_nesting "$mem"); then
+        echo "OK: ${d##*/}: every top-N list is inside the same year's larger lists"
+      else
+        echo "FAIL: ${d##*/}: a smaller list is not nested in the same year's larger list:"; echo "$out"
+        echo "  $(echo "$out" | wc -l | tr -d ' ') (list, symbol) cells"; rc=1
+      fi
+    fi
     earlier="$earlier $d"
   done
   rm -f "$mem"
@@ -125,19 +157,39 @@ self_test() {
     echo "FAIL: self-test: the inherited fixture did not fail on the cross-vintage test"; st_rc=1
   fi
   if ! (check_root "$t/ok") > /dev/null; then echo "FAIL: self-test: a later vintage holding only the survivor failed"; st_rc=1; fi
+  # Nesting (#3732 QC): top-4000 dropped the leg top-3000 keeps and holds the other one instead; it must fail for the
+  # nesting reason. The same lists with the top-3000 leg kept in top-4000 pass.
+  mkdir -p "$t/nest/pit-v1/composition" "$t/nestok/pit-v1/composition"
+  for r in nest nestok; do
+    printf 'top-4000-2009 %s %s\n' "$([ $r = nest ] && echo OLD || echo NEW)" "$([ $r = nest ] && echo NEW || echo OLD)" \
+      > "$t/$r/pit-v1/twin-drops.txt"
+    printf '((entries (((symbol OLD) (weight 1)) ((symbol A) (weight 1)))))\n' > "$t/$r/pit-v1/composition/top-3000-2009.sexp"
+  done
+  printf '((entries (((symbol NEW) (weight 1)) ((symbol A) (weight 1)))))\n' > "$t/nest/pit-v1/composition/top-4000-2009.sexp"
+  printf '((entries (((symbol OLD) (weight 1)) ((symbol A) (weight 1)))))\n' > "$t/nestok/pit-v1/composition/top-4000-2009.sexp"
+  if nest=$(check_root "$t/nest"); then echo "FAIL: self-test: a top-3000 name missing from top-4000 passed"; st_rc=1; fi
+  if ! echo "$nest" | grep -q -F "top-3000-2009: OLD is not in top-4000-2009"; then
+    echo "FAIL: self-test: the nesting fixture did not fail on the nesting test"; st_rc=1
+  fi
+  if ! (check_root "$t/nestok") > /dev/null; then echo "FAIL: self-test: nested lists failed"; st_rc=1; fi
   rm -rf "$t"
   return "$st_rc"
 }
 
+NEST_FROM=1
 self_test || exit 1
+
+# pit-v12 is not nested (31 top-1000 names missing from the same year's top-3000, left by the #3388 twin dedupe;
+# reported in dev/experiments/v13-twin-repair-2026-11-25/README.md), so nesting is enforced from pit-v13 on.
+NEST_FROM=${TWIN_NEST_FROM:-13}
 
 ROOT=$(repo_root)
 PIT=${TWIN_PIT_ROOT:-$ROOT/trading/test_data/backtest_scenarios}
 [ -n "$(vintages "$PIT")" ] || die "pit_twin_cooccur_check: no pit-vN dir with twin-drops.txt under $PIT"
 if check_root "$PIT"; then
-  echo "OK: pit_twin_cooccur_check: every vintage's twin drops hold, own and inherited"
+  echo "OK: pit_twin_cooccur_check: every vintage's twin drops hold, own and inherited, and the lists nest"
 else
-  echo "FAIL: pit_twin_cooccur_check: a rename twin pair co-occurs in a composition list (see above)."
-  echo "Re-apply the drops with dev/experiments/v12-twin-scan-2026-10-22/apply-drops.sh <drops> <lists> and record them in the vintage's twin-drops.txt."
+  echo "FAIL: pit_twin_cooccur_check: a rename twin pair co-occurs in a composition list, or a list is not nested (see above)."
+  echo "Re-apply the drops with dev/experiments/v12-twin-scan-2026-10-22/apply-drops.sh <drops> <lists> and record them in the vintage's twin-drops.txt; for nesting, keep in top-4000-Y the twin leg top-3000-Y keeps."
   exit 1
 fi
