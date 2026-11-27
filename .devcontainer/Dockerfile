@@ -116,7 +116,7 @@ RUN opam repository set-url default https://opam.ocaml.org && opam update
 # loop below so every later layer resolves them. ci.yml runs the same script,
 # so a PR that bumps the commit is tested before this image is rebuilt.
 # -----------------------------------------------------------------------------
-COPY .devcontainer/pin_matchers.sh /tmp/pin_matchers.sh
+COPY --chown=opam:opam .devcontainer/pin_matchers.sh /tmp/pin_matchers.sh
 RUN sh /tmp/pin_matchers.sh && rm /tmp/pin_matchers.sh
 
 # -----------------------------------------------------------------------------
