@@ -11,6 +11,10 @@
 #      after the pin appears, a plain rerun extracts it and writes the marker
 #   6. test-bars.md5 with a wrong sum at the pin: exit 1 naming the file, no marker
 #   7. pin with no test-bars.md5: exit 1, no marker
+#   8. test-bars.md5 naming a file absent after extraction: exit 1 with a
+#      `missing:` line, no marker
+#   9. fallback source (pin not in the checkout) with no test-bars.md5: exit 0,
+#      "no test-bars.md5" WARN, bars copied, no marker
 
 set -u
 . "$(dirname "$0")/_check_lib.sh"
@@ -34,6 +38,9 @@ commit_src() { git -C "$SRC" add -A && git -C "$SRC" -c user.name=t -c user.emai
 PIN_NOMAN=$(commit_src bars)
 echo '00000000000000000000000000000000  A/L/AAPL/data.csv' >"$SRC_TD/test-bars.md5"
 PIN_BAD=$(commit_src bad-manifest)
+(cd "$SRC_TD" && md5sum A/L/AAPL/data.csv >test-bars.md5)
+echo '00000000000000000000000000000000  Z/Z/GHOST/data.csv' >>"$SRC_TD/test-bars.md5"
+PIN_GHOST=$(commit_src ghost-manifest)
 (cd "$SRC_TD" && md5sum A/L/AAPL/data.csv >test-bars.md5)
 PIN=$(commit_src manifest)
 
@@ -92,6 +99,25 @@ W5="$T/w5"; mk_tree "$W5" "$PIN_NOMAN"
 out=$(run "$W5" TRADING_RESULTS_DIR="$SRC"); rc=$?
 { [ $rc -eq 1 ] && echo "$out" | grep -q 'no test-bars.md5' && [ ! -f "$W5/trading/test_data/.bars-pin" ]; } &&
   ok "missing manifest at the pin exits 1" || bad "missing manifest: rc=$rc $out"
+
+# Manifest names a file absent after extraction: exit 1, `missing:` line, no marker.
+W6="$T/w6"; mk_tree "$W6" "$PIN_GHOST"
+out=$(run "$W6" TRADING_RESULTS_DIR="$SRC"); rc=$?
+{ [ $rc -eq 1 ] && echo "$out" | grep -q 'missing: Z/Z/GHOST/data.csv' && [ ! -f "$W6/trading/test_data/.bars-pin" ]; } &&
+  ok "manifest file absent after extraction exits 1" || bad "absent file: rc=$rc $out"
+
+# Fallback source (pin not in the checkout) with no manifest: WARN, bars copied, no marker.
+SRC2="$T/results2"
+mkdir -p "$SRC2/trading/test_data/A/L/AAPL"
+cp "$SRC_TD/A/L/AAPL/data.csv" "$SRC2/trading/test_data/A/L/AAPL/data.csv"
+git init -q "$SRC2"
+git -C "$SRC2" add -A
+git -C "$SRC2" -c user.name=t -c user.email=t@t commit -q -m bars
+W7="$T/w7"; mk_tree "$W7" "$MISSING"
+out=$(run "$W7" TRADING_RESULTS_DIR="$SRC2"); rc=$?
+{ [ $rc -eq 0 ] && echo "$out" | grep -q 'WARN: no test-bars.md5' && [ -f "$W7/trading/test_data/A/L/AAPL/data.csv" ] &&
+  [ ! -f "$W7/trading/test_data/.bars-pin" ]; } &&
+  ok "fallback without manifest warns, copies, no marker" || bad "fallback no manifest: rc=$rc $out"
 
 [ "$fails" -eq 0 ] || { echo "FAIL: fetch_test_bars_test: $fails case(s)"; exit 1; }
 echo "OK: fetch_test_bars_test"
