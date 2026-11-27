@@ -1,10 +1,10 @@
+(* The backtest's builder, so every field it threads reaches the report too,
+   except the F5 screen-time volume waiver: the backtest waives volume at screen
+   time only because [Volume_eject_runner] re-checks it in the fill week, and
+   the live path has no fill-week check, so the report keeps the gate (#3726). *)
 let of_strategy_config (config : Weinstein_strategy.config) =
   {
-    Stock_analysis.default_config with
-    overhead_supply = config.overhead_supply;
-    virgin_crossing_readmission = config.virgin_crossing_readmission;
-    virgin_supply_basis = config.virgin_supply_basis;
-    entry_anchor_local_range_weeks = config.entry_anchor_local_range_weeks;
-    entry_cap_local_range_weeks = config.entry_cap_local_range_weeks;
-    entry_freshness_basis = config.entry_freshness_basis;
+    (Weinstein_strategy.stock_analysis_config_for ~config) with
+    require_breakout_volume =
+      Stock_analysis.default_config.require_breakout_volume;
   }
