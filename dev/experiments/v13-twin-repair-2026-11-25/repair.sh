@@ -13,13 +13,15 @@
 #      are the same.
 #   2. Scan cells: the v13 scan's drops.txt rows, less exclude-pairs.txt. A row for a v12 pair is turned to v12's
 #      direction (v12's loser leaves), so a re-drawn survivor can never drop both legs of one list.
+#   2b. Nesting (#3732 QC): a top-4000-Y cell whose loser stays in top-3000-Y (its survivor is not there) is flipped,
+#      so top-4000-Y keeps the top-3000 leg and every top-3000-Y stays inside top-4000-Y. Flipped rows carry ,nest.
 #   3. One row per (LIST, DROPPED), inherited first. Survivor chains resolved per list as in
 #      ../twin-dedupe-26y-2026-10-29/apply-full-dedupe.sh (via= names the first survivor when it is itself dropped).
 #   4. apply-drops.sh cuts the entries; existing pit-v13 rows whose survivor this repair drops from that list are
 #      re-pointed to the new survivor (via=<old survivor>), so the own-rows check still describes the list.
 #   5. twin-drops.txt is rewritten: header, existing rows (re-pointed), then the new rows.
 # Cells whose two legs are not both members are skipped, so a re-run on repaired lists applies nothing.
-# Writes results/new-rows.txt (LIST DROPPED SURVIVOR [via=] src=v12|scan) beside this script (env ROWS_OUT overrides).
+# Writes results/new-rows.txt (LIST DROPPED SURVIVOR [via=] src=v12|scan[,nest]) beside this script (env ROWS_OUT overrides).
 # Afterwards: regenerate PIT/composition.md5, run trading/devtools/checks/pit_twin_cooccur_check.sh.
 set -eu
 
@@ -59,8 +61,20 @@ awk 'FILENAME == ARGV[1] { if ($0 !~ /^#/ && NF >= 2) { ex[$1 " " $2] = 1; ex[$2
   "$EXCLUDE" "$PREV" "$SCANOUT/drops.txt" \
   | awk 'NR == FNR { m[$1 " " $2] = 1; next } (($1 " " $2) in m) && (($1 " " $3) in m)' "$TMP/mem.txt" - > "$TMP/scan.txt"
 
+# 2b. nesting: top-3000-Y must stay inside top-4000-Y (#3732 QC). A top-4000-Y cell whose loser stays in top-3000-Y
+#     (its survivor is not there: it ranks 3001-4000) is flipped, so top-4000-Y keeps the top-3000 leg.
+cat "$TMP/inherited.txt" "$TMP/scan.txt" > "$TMP/raw-cells.txt"
+awk 'function year(l,   n, p) { n = split(l, p, "-"); return p[n] }
+     FNR == 1 { f++ }
+     f == 1 { if ($1 ~ /^top-3000-/) m3[year($1) " " $2] = 1; next }
+     f == 2 { if ($1 ~ /^top-3000-/) gone[year($1) " " $2] = 1; next }
+     { y = year($1); in3d = ((y " " $2) in m3) && !((y " " $2) in gone); in3s = ((y " " $3) in m3) && !((y " " $3) in gone) }
+     $1 ~ /^top-4000-/ && in3d && !in3s { print $1, $3, $2, $4 ",nest"; next }
+     { print }' "$TMP/mem.txt" "$TMP/raw-cells.txt" "$TMP/raw-cells.txt" > "$TMP/nested-cells.txt"
+echo "nesting: $(grep -c ",nest\$" "$TMP/nested-cells.txt" || true) top-4000 cells flipped to keep the top-3000 leg"
+
 # 3. one row per (LIST, DROPPED), chains resolved
-cat "$TMP/inherited.txt" "$TMP/scan.txt" | awk '!seen[$1 " " $2]++' > "$TMP/cells.txt"
+awk '!seen[$1 " " $2]++' "$TMP/nested-cells.txt" > "$TMP/cells.txt"
 awk '
   { L[NR] = $1; D[NR] = $2; S[NR] = $3; src[NR] = $4; surv[$1 " " $2] = $3 }
   END {
