@@ -12,7 +12,7 @@
 #               below the header.
 #   S3          + the universe schedule and universe_path moved from pit-v12/composition/ to pit-v13/composition/
 #               (same 27 rebalance dates 1999-05-31 .. 2025-05-31 as the record, same top-3000 list names). The lists
-#               are the repaired ones of #3727 (chain.sh guards pit-v13/composition.md5).
+#               are the repaired ones of #3727, re-nested by #3734 (chain.sh guards pit-v13/composition.md5).
 #   U4          S3 with top-3000-YYYY -> top-4000-YYYY in every list path, and universe_size 3000 -> 4000
 set -eu
 cd "$(dirname "$0")/../../.."   # the repo root, wherever it is called from
@@ -32,7 +32,7 @@ for k in 0 1 2 3 4; do
     {
       echo ";; universe-depth-rerun-2026-11-26 udr-$arm-k$k: rk-k$k (../record-kseed-2026-10-27/specs/rk-k$k.sexp) below this header,"
       echo ";; plus initial_cash 100000.0 and dev/weekly-picks/live-size-overrides.sexp appended last (= NAV-scale ns-P-100k-k$k), on"
-      echo ";; the repaired (#3727) pit-v13 top-$depth schedule (universe_size $depth), require_structural_stop true (the record's)."
+      echo ";; the repaired (#3727, #3734) pit-v13 top-$depth schedule (universe_size $depth), require_structural_stop true (the record's)."
       echo ";; Staging scenario, NOT a golden. Pre-registration: ../PREREG.md. Written by ../make_specs.sh."
       OVR=$P_OVR awk -v a="$arm" -v k="$k" -v d="$depth" '
         /^;;/ { next }

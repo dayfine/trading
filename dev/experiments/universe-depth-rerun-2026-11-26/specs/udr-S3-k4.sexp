@@ -1,6 +1,6 @@
 ;; universe-depth-rerun-2026-11-26 udr-S3-k4: rk-k4 (../record-kseed-2026-10-27/specs/rk-k4.sexp) below this header,
 ;; plus initial_cash 100000.0 and dev/weekly-picks/live-size-overrides.sexp appended last (= NAV-scale ns-P-100k-k4), on
-;; the repaired (#3727) pit-v13 top-3000 schedule (universe_size 3000), require_structural_stop true (the record's).
+;; the repaired (#3727, #3734) pit-v13 top-3000 schedule (universe_size 3000), require_structural_stop true (the record's).
 ;; Staging scenario, NOT a golden. Pre-registration: ../PREREG.md. Written by ../make_specs.sh.
 ((name "udr-S3-k4")
  (description "universe-depth rerun arm S3, record config at live size (100k, live-size liquidity), repaired pit-v13 top-3000, require_structural_stop true, Seeded tie order seed 4, 26y, interest + dividends")

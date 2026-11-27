@@ -4,17 +4,20 @@
 # rule: PREREG.md beside this file; run notes: README.md. NOT run by its author.
 #
 #   udr-S3-kK  NAV-scale ns-P-100k-kK (record rk-kK at initial_cash 1e5 + the live-size lines appended last) on the
-#              repaired (#3727) pit-v13 top-3000 schedule
+#              repaired (#3727, re-nested #3734) pit-v13 top-3000 schedule
 #   udr-U4-kK  S3 on repaired pit-v13 top-4000, universe_size 4000         V6 vs S3
 # Specs are written by make_specs.sh; every relation is re-checked here (sh chain.sh check K) before anything runs.
 #
 # Derived from ../universe-depth-2026-11-23/chain.sh (the first run, INVALID on V6: rename twins in the v13 lists).
 # What changed, and nothing else:
 #   - arms S3 and U4 only (N3 / UN4 dropped, user decision; PREREG.md), one V6 pair (U4 vs S3);
-#   - list guards before the cells (list_checks): pit-v13/composition.md5 is #3727's file (md5 COMP_MD5) and every
-#     list matches it, and trading/devtools/checks/pit_twin_cooccur_check.sh passes;
+#   - list guards before the cells (list_checks): pit-v13/composition.md5 is #3734's file (md5 COMP_MD5) and every
+#     list matches it, trading/devtools/checks/pit_twin_cooccur_check.sh passes (twins and nesting), and every
+#     schedule year's top-3000 is inside its top-4000;
 #   - the expected counts re-derived from the repaired lists (spec checks and preflight): schedule union S 9,583 /
-#     U 12,215, cache loads S 9,598 / U 12,230 (union + the 15 warehouse extras), ABSENT exactly the 4 quarantine names;
+#     U 12,221, cache loads S 9,598 / U 12,236 (union + the 15 warehouse extras), ABSENT exactly the 4 quarantine names;
+#   - guards: on a relaunch the image Id must equal the first launch's, as HEAD must (first-run defect D6 is otherwise
+#     kept: a relaunch that rebuilds at the same HEAD and image skips the tripwire; README "Resume and D6");
 #   - review-pack inputs (packprep, README "Review pack"): per cell the trade_audit_report (.md/.html, built here on
 #     the v13 warehouse) and the gzipped trade_audit.sexp, both PRIVATE, so the pack can be built after the run;
 #     `sh chain.sh pack ARM` builds it from a trading-results checkout.
@@ -28,7 +31,7 @@
 #
 # Runs on the session host (POSIX sh) from the session's checkout at SC_SHA, the one main SHA all five sessions use
 # (named in the launch brief). Every OCaml step runs in ghcr.io/dayfine/trading-ci:latest with the checkout mounted at
-# /w. Everything is written under .sweep-output/universe-depth/ (gitignored, inside the mount); TMPDIR points there too.
+# /w. Everything is written under .sweep-output/universe-depth-rerun/ (gitignored, inside the mount); TMPDIR points there too.
 # Launch (a session's background task is killed at 2 h, so detach):
 #   SC_SHA=<sha> setsid nohup sh dev/experiments/universe-depth-rerun-2026-11-26/chain.sh run K \
 #     >> .sweep-output/universe-depth-rerun/run.out 2>&1 < /dev/null &
@@ -79,7 +82,7 @@
 # Cell guard: CELL_TIMEOUT 28,000 s and CELL_GB 7, the first run's values, unchanged. That run measured (chain-kK.log
 # RESULT lines, ../universe-depth-2026-11-23/results/): S3 6,690-8,619 s at 6.09-6.12 GB peak RSS, U4 8,509-9,891 s at
 # 7.33-7.36 GB, the tripwire 6,059-8,073 s at 5.74-5.75 GB, so the timeout is 2.8 x the slowest U4 cell. The repaired
-# lists load fewer names (U 12,230 vs 12,345). PAR = (MemTotal - 3) / 7: 1 on the 15 GB VM (PAR=2 overrides, at the risk
+# lists load fewer names (U 12,236 vs 12,345). PAR = (MemTotal - 3) / 7: 1 on the 15 GB VM (PAR=2 overrides, at the risk
 # of an OOM kill that the relaunch would repair). A session at PAR 1: stage ~0.3 h x 2, build, tripwire ~2 h, two
 # preflights ~0.2 h, two cells ~2-2.8 h each, review-pack inputs ~0.2 h: about 7-9 h.
 # R2 credentials (R2_*) come from the environment and are never printed (dev/scripts/r2_bars.sh header).
@@ -93,13 +96,13 @@ REC=dev/experiments/record-kseed-2026-10-27/specs
 LIVE=dev/weekly-picks/live-size-overrides.sexp
 PIT=trading/test_data/backtest_scenarios/pit-v13
 TWIN_CHECK=trading/devtools/checks/pit_twin_cooccur_check.sh
-COMP_MD5=d587c5093f1a21fe137f4566826a018d   # md5 of $PIT/composition.md5 as #3727 (96b4eb2b6) left it; 58 lists
+COMP_MD5=140ae53e42ab75d812ebbe4350fd5688   # md5 of $PIT/composition.md5 as #3734 (0890f9eb9) left it; 58 lists
 COMP_N=58
 # Counts on the repaired lists (README "Counts"): the schedule's union (= params universe_size), the cache's n_symbols
 # (union + the 15 warehouse extras), and the names the v13pit-12710 manifest lacks (the 4 of pit-v13/quarantine.txt).
 # First run, pre-repair: union 9,679 / 12,330, loads 9,694 / 12,345, ABSENT the same 4.
-EXPECT_UNION_3000=9583; EXPECT_UNION_4000=12215
-EXPECT_LOADED_3000=9598; EXPECT_LOADED_4000=12230
+EXPECT_UNION_3000=9583; EXPECT_UNION_4000=12221
+EXPECT_LOADED_3000=9598; EXPECT_LOADED_4000=12236
 EXPECT_ABSENT="DNGFF HLAN MDFI SYNI"
 PACK_GZ_MAX_MB=95                               # a gzipped audit above this is not kept (GitHub's 100 MB file limit)
 OUT=${OUT:-$REPO/.sweep-output/universe-depth-rerun}
@@ -117,8 +120,8 @@ CELL_TIMEOUT=${CELL_TIMEOUT:-28000}
 CELL_GB=7; MEM_RESERVE_GB=3
 DISK_MIN_GB=${DISK_MIN_GB:-8}
 # NAV-scale's NEED (#3510 shards, #3547 relocatable warehouse, #3695 participation gate, #3697 initial_cash) + #3712
-# + #3727 (the twin repair of the lists)
-NEED="20824663d 8ee1ed797 e8e047ff9 c649c6dbf 6a6f89de8 96b4eb2b6"
+# + #3727 (the twin repair of the lists) + #3734 (the re-nest of top-3000 inside top-4000)
+NEED="20824663d 8ee1ed797 e8e047ff9 c649c6dbf 6a6f89de8 96b4eb2b6 0890f9eb9"
 ARMS="S3 U4"
 # final_prices.csv is new (private): the trade_audit_report HTML marks open positions with it (review-pack input)
 KINDS="actual.sexp trades.csv splits.csv params.sexp summary.sexp trade_audit.sexp open_positions.csv force_liquidations.sexp equity_curve.csv macro_trend.sexp final_prices.csv"
@@ -129,7 +132,7 @@ use_stage() {
     v12) WH_NAME=v12wk-9236; CA_NAME=corpact-2026-10-27; BARS_NAME=data-20261102; EXPECT_WH=9236; EXPECT_DIV=11880
          MMAP_HANDLES=12000; DISK_STAGE_GB=${DISK_STAGE_GB_V12:-12} ;;   # NAV-scale's values, so the tripwire matches
     v13) WH_NAME=v13pit-12710; CA_NAME=corpact-2026-11-23; BARS_NAME=data-20261123; EXPECT_WH=12710; EXPECT_DIV=
-         MMAP_HANDLES=16000; DISK_STAGE_GB=${DISK_STAGE_GB_V13:-16} ;;   # handles > the U4 load, 12,230 symbols
+         MMAP_HANDLES=16000; DISK_STAGE_GB=${DISK_STAGE_GB_V13:-16} ;;   # handles > the U4 load, 12,236 symbols
     *) echo "unknown stage '$1' (v12 | v13)" >&2; exit 2 ;;
   esac
   SD=$OUT/$1; WH=$SD/warehouse; CA=$SD/corpact; BARS=$SD/bars; TD=$SD/td-full; STAGE=$1
@@ -185,8 +188,12 @@ guards() {
   [ -f "$EXP/PREREG.md" ] && [ -f "$EXP/README.md" ] || die "$EXP not in the checkout (run kit not merged?)"
   git diff --quiet "$NS_HEAD" HEAD -- "$TRIP_SPEC" || die "$TRIP_SPEC changed since NAV-scale's run ($NS_HEAD)"
   [ "$(cut -c1-32 "$TRIP_MD5_FILE")" = "$TRIP_MD5" ] || die "$TRIP_MD5_FILE is not $TRIP_MD5"
-  m=$(mem_gb)
-  log "HEAD=$(git rev-parse --short=9 HEAD) image=$IMG $(docker image inspect -f '{{.Id}}' "$IMG" 2>/dev/null | cut -c1-19) mem=${m:-?}G par=$(par_n)"
+  m=$(mem_gb); iid=$(docker image inspect -f '{{.Id}}' "$IMG" 2>/dev/null | cut -c1-19)
+  # D6: a relaunch skips the tripwire, so it must run the image the tripwire ran (compared like HEAD above)
+  previd=$(sed -n "s#.*\] HEAD=[0-9a-f]* image=$IMG \(sha256:[0-9a-f]*\) .*#\1#p" "$LOG" | head -1)
+  [ -n "$iid" ] || die "docker image inspect $IMG gave no Id"
+  [ -z "$previd" ] || [ "$previd" = "$iid" ] || die "image $IMG is $iid, but this chain.log's first launch ran $previd"
+  log "HEAD=$(git rev-parse --short=9 HEAD) image=$IMG $iid mem=${m:-?}G par=$(par_n)"
   [ "${m:-0}" -ge $((CELL_GB + MEM_RESERVE_GB)) ] || die "MemTotal ${m:-?} GB < $((CELL_GB + MEM_RESERVE_GB)) (a U4 cell peaked at 7.36 GB in the first run)"
 }
 
@@ -267,7 +274,7 @@ spec_checks() { # $1 seed
     for l in $(sched_lists "$s"); do [ -s "$REPO/trading/test_data/backtest_scenarios/$l" ] || die "$s: $l not in the checkout"; done
     # the counts re-derived from the repaired lists (README "Counts"); the preflight checks the runner against them
     eu=$(expect_union "$arm"); el=$(expect_loaded "$arm"); un=$(universe_n "$s"); ln=$(loaded_n "$s")
-    [ "$un" = "$eu" ] && [ "$ln" = "$el" ] || die "$s: schedule union $un / loads $ln, expected $eu / $el (the #3727 lists)"
+    [ "$un" = "$eu" ] && [ "$ln" = "$el" ] || die "$s: schedule union $un / loads $ln, expected $eu / $el (the #3727 + #3734 lists)"
   done
   log "SPEC CHECKS OK k$1 (udr-*-k$1 = ns-P-100k-k$1 on pit-v13; U4 top-4000 / universe_size 4000; unions S3 $EXPECT_UNION_3000 / U4 $EXPECT_UNION_4000, loads $EXPECT_LOADED_3000 / $EXPECT_LOADED_4000)"
 }
@@ -275,11 +282,14 @@ expect_union() { case $1 in S3) echo "$EXPECT_UNION_3000" ;; U4) echo "$EXPECT_U
 expect_loaded() { case $1 in S3) echo "$EXPECT_LOADED_3000" ;; U4) echo "$EXPECT_LOADED_4000" ;; esac; }
 
 # ------------------------------------------------------------------------------------------------------- list checks
-# The lists the cells read are #3727's: composition.md5 is that commit's file, every list matches its line, and no
-# list holds both legs of a recorded rename twin (the class that made the first run INVALID). Host-only, read-only.
+# The lists the cells read are #3727's twin repair as re-nested by #3734: composition.md5 is #3734's file, every list
+# matches its line, no list holds both legs of a recorded rename twin (the class that made the first run INVALID),
+# and every top-3000-YYYY of the schedule is inside the same year's top-4000-YYYY (U4 = S3 + ranks 3001-4000, which
+# the A1 trace and the depth.tsv band assume; #3727 broke it in 70 name-years). The twin check covers nesting too;
+# the explicit loop below does not depend on its wording. Host-only, read-only.
 list_checks() {
   cm=$REPO/$PIT/composition.md5
-  [ "$(md5_of "$cm")" = "$COMP_MD5" ] || die "$PIT/composition.md5 md5 $(md5_of "$cm"), expected $COMP_MD5 (#3727)"
+  [ "$(md5_of "$cm")" = "$COMP_MD5" ] || die "$PIT/composition.md5 md5 $(md5_of "$cm"), expected $COMP_MD5 (#3734)"
   n=$(wc -l < "$cm" | tr -d ' '); [ "$n" = "$COMP_N" ] || die "$PIT/composition.md5 has $n lines, expected $COMP_N"
   nf=$(find "$REPO/$PIT/composition" -name '*.sexp' | wc -l | tr -d ' ')
   [ "$nf" = "$COMP_N" ] || die "$PIT/composition/ holds $nf lists, expected $COMP_N"
@@ -289,7 +299,18 @@ list_checks() {
   # the check finds the pit-vN dirs from the repo root (git rev-parse in its cwd), so it runs from $REPO
   tc=$(cd "$REPO" && sh "$TWIN_CHECK" 2>&1) || { printf '%s\n' "$tc"; die "$TWIN_CHECK FAILED"; }
   printf '%s\n' "$tc" | grep -q '^OK: pit-v13: no pit-v12 twin pair co-occurs' || die "$TWIN_CHECK did not check pit-v13 against pit-v12"
-  log "LIST CHECKS OK: composition.md5 $COMP_MD5 ($COMP_N lists match); $(printf '%s\n' "$tc" | tail -1)"
+  printf '%s\n' "$tc" | grep -q '^OK: pit-v13: every top-N list is inside' || die "$TWIN_CHECK did not check pit-v13 nesting"
+  nn=0; y=1999
+  while [ "$y" -le 2025 ]; do   # the schedule's years (1999-05-31 .. 2025-05-31)
+    c=$(awk '{ r = $0
+          while (match(r, /\(symbol [^)]*\)/)) { s = substr(r, RSTART + 8, RLENGTH - 9); r = substr(r, RSTART + RLENGTH)
+            if (FILENAME == ARGV[1]) big[s] = 1; else if (!(s in big) && !(s in seen)) { seen[s] = 1; n++ } } }
+        END { print n + 0 }' "$REPO/$PIT/composition/top-4000-$y.sexp" "$REPO/$PIT/composition/top-3000-$y.sexp")
+    [ "$c" = 0 ] || log "NESTING top-3000-$y: $c names not in top-4000-$y"
+    nn=$((nn + c)); y=$((y + 1))
+  done
+  [ "$nn" = 0 ] || die "nesting: $nn name-years are in top-3000-YYYY but not in the same year's top-4000-YYYY"
+  log "LIST CHECKS OK: composition.md5 $COMP_MD5 ($COMP_N lists match); top-3000 inside top-4000 in all 27 schedule years; $(printf '%s\n' "$tc" | tail -1)"
 }
 # Symbols the runner should load for a spec: its schedule's lists' union (params universe_size), plus the 15
 # warehouse extras (the n_symbols of the cache line). v12 check: 9,185 + 15 = 9,200, NAV-scale's logged values.
@@ -543,7 +564,7 @@ publish() { # $1 seed: the private half into trading-results main
   { git -C "$TR" fetch -q origin main && git -C "$TR" checkout -q main && git -C "$TR" merge -q --ff-only origin/main; } \
     || die "trading-results at $TR does not fast-forward to origin/main"
   cp -R "$src"/. "$TR/"; git -C "$TR" add "$EXP"
-  git -C "$TR" diff --cached --quiet || G "$TR" commit -q -m "universe-depth k$k: price-bearing cells" || die "trading-results commit"
+  git -C "$TR" diff --cached --quiet || G "$TR" commit -q -m "universe-depth-rerun k$k: price-bearing cells" || die "trading-results commit"
   i=0; until git -C "$TR" push -q origin HEAD:main 2>/dev/null; do i=$((i + 1))
     [ "$i" -le 3 ] && G "$TR" pull -q --rebase origin main || die "push trading-results main"; done
   log "PUBLISH k$k private: dayfine/trading-results main at $(git -C "$TR" rev-parse --short=9 HEAD)"
