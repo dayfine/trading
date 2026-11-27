@@ -11,6 +11,7 @@
   fpath
   ounit2
   matchers
+  status_matchers
   status
   uri)
  (preprocess

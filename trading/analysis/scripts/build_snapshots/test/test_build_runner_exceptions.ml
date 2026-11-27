@@ -12,6 +12,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Series_tail = Snapshot_pipeline.Series_tail
 module Series_splice = Snapshot_pipeline.Series_splice
 

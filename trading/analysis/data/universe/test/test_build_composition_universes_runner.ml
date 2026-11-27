@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Runner = Build_composition_universes_runner_lib
 
 (* ---------------------------------------------------------------------- *)

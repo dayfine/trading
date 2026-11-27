@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 
 let run_deferred d = Async.Thread_safe.block_on_async_exn (fun () -> d)
 

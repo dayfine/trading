@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Runner = Build_synthetic_universes_runner_lib
 module SC = Shiller.Shiller_client
 module KF = Kenneth_french.Kenneth_french_client

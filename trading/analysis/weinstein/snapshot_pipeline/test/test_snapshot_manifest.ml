@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 

@@ -8,22 +8,34 @@
 (test
  (name test_position)
  (modules test_position)
- (libraries ounit2 core trading.strategy trading.base matchers))
+ (libraries
+  ounit2
+  core
+  trading.strategy
+  trading.base
+  matchers
+  status_matchers))
 
 (test
  (name test_strategy_lifecycle)
  (modules test_strategy_lifecycle)
- (libraries ounit2 core trading.strategy trading.base matchers))
+ (libraries
+  ounit2
+  core
+  trading.strategy
+  trading.base
+  matchers
+  status_matchers))
 
 (test
  (name test_mock_market_data)
  (modules test_mock_market_data)
- (libraries ounit2 core test_helpers types matchers))
+ (libraries ounit2 core test_helpers types matchers status_matchers))
 
 (test
  (name test_price_generators)
  (modules test_price_generators)
- (libraries ounit2 core test_helpers types matchers))
+ (libraries ounit2 core test_helpers types matchers status_matchers))
 
 (test
  (name test_ema_strategy)
@@ -35,7 +47,8 @@
   trading.base
   test_helpers
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_buy_and_hold_strategy)
@@ -47,7 +60,8 @@
   trading.base
   test_helpers
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_bah_benchmark_strategy)
@@ -59,14 +73,21 @@
   trading.strategy
   trading.base
   test_helpers
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_portfolio_view)
  (modules test_portfolio_view)
- (libraries ounit2 core trading.strategy types matchers))
+ (libraries ounit2 core trading.strategy types matchers status_matchers))
 
 (test
  (name test_position_sexp)
  (modules test_position_sexp)
- (libraries ounit2 core trading.strategy trading.base matchers))
+ (libraries
+  ounit2
+  core
+  trading.strategy
+  trading.base
+  matchers
+  status_matchers))

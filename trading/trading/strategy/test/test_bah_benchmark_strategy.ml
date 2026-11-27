@@ -4,6 +4,7 @@ open OUnit2
 open Core
 open Trading_strategy
 open Matchers
+open Status_matchers
 
 let date_of_string = Date.of_string
 

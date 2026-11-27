@@ -1,3 +1,0 @@
-(test
- (name status_test)
- (libraries ounit2 status))

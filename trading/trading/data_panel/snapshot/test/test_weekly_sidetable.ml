@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
 let _tmp_path () =

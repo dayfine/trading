@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Shares_outstanding_enrichment_lib
 
 (* ---- Fixtures ----

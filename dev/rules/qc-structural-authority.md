@@ -18,8 +18,8 @@ architecture and conventions.
   `build-and-test` at the reviewed SHA (agent standing rule "CI is the build of record"),
   cover most checks via dune-wired linters: `fn_length_linter`,
   `linter_magic_numbers.sh`, `linter_mli_coverage.sh`, `nesting_linter`.
-- Test framework of record: OUnit2 + the in-repo Matchers library
-  (`base/matchers/`). Test conventions are in `.claude/rules/test-patterns.md`.
+- Test framework of record: OUnit2 + the external dayfine/matchers library
+  (pinned by `.devcontainer/pin_matchers.sh`). Test conventions are in `.claude/rules/test-patterns.md`.
 
 ## Situational rule checks (read the rule when the PR matches)
 

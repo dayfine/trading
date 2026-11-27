@@ -126,6 +126,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pin dayfine/matchers before the published image carries it (see ci.yml).
+      - name: Pin dayfine/matchers packages
+        working-directory: ${{ github.workspace }}
+        run: |
+          eval "$(opam env)"
+          sh .devcontainer/pin_matchers.sh
+
       - name: Fetch EODHD bar fixtures (private trading-results, #3676)
         working-directory: ${{ github.workspace }}
         env:
@@ -136,7 +143,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: trading/_build
-          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          key: dune-${{ runner.os }}-${{ hashFiles('.devcontainer/pin_matchers.sh', 'trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
 
       - name: Run SP500 15y golden
         id: golden_sp500_15y

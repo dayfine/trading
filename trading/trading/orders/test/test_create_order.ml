@@ -5,6 +5,7 @@ open Status
 open Trading_orders.Types
 open Trading_orders.Create_order
 open Matchers
+open Status_matchers
 
 let test_create_limit_order _ =
   let params =

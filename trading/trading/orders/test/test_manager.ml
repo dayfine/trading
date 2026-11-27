@@ -5,6 +5,7 @@ open Trading_orders.Types
 open Trading_orders.Create_order
 open Trading_orders.Manager
 open Matchers
+open Status_matchers
 
 (* Helper functions *)
 let compare_orders_by_id a b = String.compare a.id b.id

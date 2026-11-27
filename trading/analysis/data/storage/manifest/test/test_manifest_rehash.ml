@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Manifest_rehash_lib
 
 (* Build a fake L1/L2-sharded data dir under a fresh tmp root and return its

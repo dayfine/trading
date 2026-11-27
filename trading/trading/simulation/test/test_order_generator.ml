@@ -5,6 +5,7 @@ open Core
 open Trading_simulation.Order_generator
 open Trading_strategy.Position
 open Matchers
+open Status_matchers
 
 let today = Date.of_string "2024-01-15"
 let empty_positions = String.Map.empty

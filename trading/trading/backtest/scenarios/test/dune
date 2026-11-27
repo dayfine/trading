@@ -43,6 +43,7 @@
   fpath
   scenario_lib
   matchers
+  status_matchers
   backtest
   backtest_cost_model
   weinstein.data_source

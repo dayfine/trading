@@ -12,6 +12,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Vt = Post_run_validator.Validator_types
 module Vd = Post_run_validator.Validator_diff
 

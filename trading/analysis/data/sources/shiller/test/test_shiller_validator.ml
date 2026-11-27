@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Core_ = Shiller_validator_core
 module Client = Shiller.Shiller_client
 

@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Stooq.Stooq_client
 
 (* Pinned fixture: 8 rows from Stooq's AAPL.US daily series. Five 2020-Q1

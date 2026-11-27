@@ -6,6 +6,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Cash_yield = Trading_simulation_cash_yield.Cash_yield
 module Portfolio = Trading_portfolio.Portfolio
 

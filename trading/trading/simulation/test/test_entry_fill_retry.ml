@@ -30,6 +30,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Entry_fill_retry = Trading_simulation.Entry_fill_retry
 module Position = Trading_strategy.Position
 module Manager = Trading_orders.Manager

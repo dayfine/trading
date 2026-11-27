@@ -9,6 +9,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Dividend_crediting = Trading_simulation_dividends.Dividend_crediting
 module Portfolio = Trading_portfolio.Portfolio
 

@@ -2,6 +2,7 @@ open OUnit2
 open Core
 open Trading_simulation.Simulator
 open Matchers
+open Status_matchers
 open Test_helpers
 
 let date_of_string s = Date.of_string s

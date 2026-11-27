@@ -12,6 +12,7 @@
   core_unix
   ounit2
   matchers
+  status_matchers
   status)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))

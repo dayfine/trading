@@ -2,6 +2,7 @@ open OUnit2
 open Core
 open Trading_strategy
 open Matchers
+open Status_matchers
 
 let date = Date.of_string "2024-01-15"
 

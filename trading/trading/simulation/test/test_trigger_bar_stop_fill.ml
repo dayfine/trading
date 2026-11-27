@@ -9,6 +9,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module Stop_fill = Trading_simulation.Trigger_bar_stop_fill
 
 let _date = Date.of_string "2024-01-04"

@@ -17,6 +17,7 @@
   core_unix.sys_unix
   ounit2
   matchers
+  status_matchers
   status
   uri)
  (deps

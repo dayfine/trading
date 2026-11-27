@@ -33,6 +33,7 @@
   eodhd
   kenneth_french
   matchers
+  status_matchers
   ounit2
   shiller
   status

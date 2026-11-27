@@ -7,6 +7,7 @@ open Trading_engine.Engine
 open Trading_engine.Types
 open Trading_engine.Price_path
 open Matchers
+open Status_matchers
 module OrderManager = Trading_orders.Manager
 
 (* Re-declare execution_report for exhaustive ppx-generated matcher.

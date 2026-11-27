@@ -7,6 +7,7 @@
   core_unix.time_ns_unix
   manifest_rehash_lib
   matchers
+  status_matchers
   ounit2
   status
   storage.manifest))

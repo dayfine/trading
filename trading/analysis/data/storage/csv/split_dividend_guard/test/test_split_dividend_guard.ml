@@ -6,6 +6,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module CA = Corporate_actions
 module G = Split_dividend_guard
 

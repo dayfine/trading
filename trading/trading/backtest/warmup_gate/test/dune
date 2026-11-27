@@ -1,3 +1,9 @@
 (tests
  (names test_warmup_trade_gate)
- (libraries ounit2 core matchers trading.strategy warmup_trade_gate))
+ (libraries
+  ounit2
+  core
+  matchers
+  status_matchers
+  trading.strategy
+  warmup_trade_gate))

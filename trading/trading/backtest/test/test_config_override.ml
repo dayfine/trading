@@ -6,6 +6,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Override = Backtest.Config_override
 
 let test_simple_top_level_field _ =

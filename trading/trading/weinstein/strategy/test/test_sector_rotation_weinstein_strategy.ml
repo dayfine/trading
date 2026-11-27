@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Sector = Weinstein_strategy.Sector_rotation_weinstein_strategy
 module Bar_reader = Weinstein_strategy.Bar_reader
 module Strategy_interface = Trading_strategy.Strategy_interface
