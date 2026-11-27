@@ -2113,6 +2113,35 @@ let test_report_record_config_readmits_like_backtest _ =
       (_backtest_analysis ~bars:_virgin_bars record).virgin_readmission )
     (pair (is_some_and (equal_to true)) (equal_to true))
 
+(* EFFECTIVENESS-PIN: resistance_min_history_bars -- weekly-report path (#3726):
+   on the virgin tape the default (floor off) grades the breakout's overhead
+   off its history, and a floor far above any view's length degrades it to
+   [Insufficient_history]; on each setting the report's grade equals the
+   backtest path's. Red when the generator drops the floor (the armed report
+   would keep the default's grade). *)
+let test_report_resistance_floor_like_backtest _ =
+  let record = _basis_config Stock_analysis_supply.One_basis in
+  let floored =
+    { record with Weinstein_strategy.resistance_min_history_bars = 10_000 }
+  in
+  let grade (a : Stock_analysis.t) =
+    Option.map a.resistance ~f:(fun (r : Resistance.result) -> r.quality)
+  in
+  let both config =
+    ( Option.bind (_report_analysis ~bars:_virgin_bars config) ~f:grade,
+      grade (_backtest_analysis ~bars:_virgin_bars config) )
+  in
+  let insufficient = Weinstein_types.Insufficient_history in
+  assert_that
+    (both record, both floored)
+    (pair
+       (pair
+          (is_some_and (not_ (equal_to insufficient)))
+          (is_some_and (not_ (equal_to insufficient))))
+       (pair
+          (is_some_and (equal_to insufficient))
+          (is_some_and (equal_to insufficient))))
+
 (* The backtest's analysis of the stale AAPL fixture: its bars up to the as-of
    date, with the prior stage the report chained ([Stock_analysis.t.prior_stage],
    the value the simulator carries from the previous Friday). *)
@@ -2171,6 +2200,8 @@ let suite =
          >:: test_report_threads_virgin_supply_basis;
          "report supply grade follows the basis like the backtest"
          >:: test_report_supply_grade_follows_basis_like_backtest;
+         "report resistance floor grades like the backtest"
+         >:: test_report_resistance_floor_like_backtest;
          "long candidate carries score components"
          >:: test_long_candidate_carries_score_components;
          "eligible beyond cap positive when cap bites"

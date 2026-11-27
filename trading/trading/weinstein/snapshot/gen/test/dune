@@ -1,6 +1,7 @@
 (tests
  (names
   test_weekly_snapshot_generator
+  test_report_analysis_config
   test_snapshot_warehouse_parity
   test_config_overrides_loader
   test_live_resistance_sketch

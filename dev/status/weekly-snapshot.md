@@ -1,11 +1,13 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-11-22
+## Last updated: 2026-11-26
 
 ## Status
 MERGED
 
 Closed 2026-11-15 (user decision, pacer #3635): no next step is queued, and the split work lands under #2973 (open). Sections below are history, not queued.
+
+**2026-11-26 (issue #3726, branch `feat/snapshot-gen-parity-3726`):** `Report_analysis_config.of_strategy_config` now starts from the backtest's `Weinstein_strategy.stock_analysis_config_for`, so the picks thread `continuation`, `resistance.min_history_bars` and the RS `Positive_declining` toggle like the backtest (all off by default; picks unchanged). One deliberate divergence: the F5 screen-time volume waiver is not copied, because the live path has no fill-week volume check (`Volume_eject_runner`'s counterpart); the report keeps `require_breakout_volume = true`. Remaining on #3726: F5 needs a live fill-week check or a decision to keep the gate at screen time.
 
 **2026-11-22 (issue #3693, branch `feat/live-size-picks`):** `weekly.sh` takes its universe floors from `WEEKLY_MIN_PRICE` / `WEEKLY_MIN_ADV` (defaults unchanged) and a `WEEKLY_PROFILE`: `record` (default) or `live-size`, which layers `dev/weekly-picks/live-size-overrides.sexp` (participation 0.10, dust entry floor $100k, hold floor $50k) on the record config and screens a $100k-ADV universe. The hold floor stays fixed: no field scales `Liquidity_exit_runner` with position size, and the picks generator never runs that exit; the smallest change (a hold-side `max_hold_adv_participation`) is proposed in the overrides file, not built. Remaining after merge: the small-NAV K=5 26y top-3000 run on the live-size profile vs the record config at the same NAV.
 
