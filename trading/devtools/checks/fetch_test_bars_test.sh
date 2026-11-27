@@ -9,6 +9,12 @@
 #   4. no source, no token: exit 1 with the clone message
 #   5. checkout lacking the pin: WARN, bars copied, marker NOT claiming the pin;
 #      after the pin appears, a plain rerun extracts it and writes the marker
+#   6. test-bars.md5 with a wrong sum at the pin: exit 1 naming the file, no marker
+#   7. pin with no test-bars.md5: exit 1, no marker
+#   8. test-bars.md5 naming a file absent after extraction: exit 1 with a
+#      `missing:` line, no marker
+#   9. fallback source (pin not in the checkout) with no test-bars.md5: exit 0,
+#      "no test-bars.md5" WARN, bars copied, no marker
 
 set -u
 . "$(dirname "$0")/_check_lib.sh"
@@ -19,15 +25,24 @@ fails=0
 ok()  { echo "PASS: $1"; }
 bad() { echo "FAIL: $1"; fails=$((fails + 1)); }
 
-# Fake trading-results with one bar file.
+# Fake trading-results with one bar file. Three commits: no manifest
+# (PIN_NOMAN), a manifest with a wrong md5 (PIN_BAD), then the good manifest
+# (PIN, also the working tree).
 SRC="$T/results"
-mkdir -p "$SRC/trading/test_data/A/L/AAPL" "$T/home"
+SRC_TD="$SRC/trading/test_data"
+mkdir -p "$SRC_TD/A/L/AAPL" "$T/home"
 echo 'date,close
-2020-01-01,1' >"$SRC/trading/test_data/A/L/AAPL/data.csv"
+2020-01-01,1' >"$SRC_TD/A/L/AAPL/data.csv"
 git init -q "$SRC"
-git -C "$SRC" add -A
-git -C "$SRC" -c user.name=t -c user.email=t@t commit -q -m bars
-PIN=$(git -C "$SRC" rev-parse HEAD)
+commit_src() { git -C "$SRC" add -A && git -C "$SRC" -c user.name=t -c user.email=t@t commit -q -m "$1" && git -C "$SRC" rev-parse HEAD; }
+PIN_NOMAN=$(commit_src bars)
+echo '00000000000000000000000000000000  A/L/AAPL/data.csv' >"$SRC_TD/test-bars.md5"
+PIN_BAD=$(commit_src bad-manifest)
+(cd "$SRC_TD" && md5sum A/L/AAPL/data.csv >test-bars.md5)
+echo '00000000000000000000000000000000  Z/Z/GHOST/data.csv' >>"$SRC_TD/test-bars.md5"
+PIN_GHOST=$(commit_src ghost-manifest)
+(cd "$SRC_TD" && md5sum A/L/AAPL/data.csv >test-bars.md5)
+PIN=$(commit_src manifest)
 
 # Fake repo tree holding a copy of the script and a pin file.
 mk_tree() { # $1 = dir, $2 = pin
@@ -43,8 +58,9 @@ run() { # $1 = tree; remaining env passed through
 
 W="$T/w1"; mk_tree "$W" "$PIN"
 out=$(run "$W" TRADING_RESULTS_DIR="$SRC"); rc=$?
-{ [ $rc -eq 0 ] && [ -f "$W/trading/test_data/A/L/AAPL/data.csv" ] && [ "$(cat "$W/trading/test_data/.bars-pin")" = "$PIN" ]; } &&
-  ok "local extraction + marker" || bad "local extraction: rc=$rc $out"
+{ [ $rc -eq 0 ] && [ -f "$W/trading/test_data/A/L/AAPL/data.csv" ] && [ "$(cat "$W/trading/test_data/.bars-pin")" = "$PIN" ] &&
+  echo "$out" | grep -q '1 files match test-bars.md5'; } &&
+  ok "local extraction + md5 check + marker" || bad "local extraction: rc=$rc $out"
 
 out=$(run "$W" TRADING_RESULTS_DIR="$SRC"); rc=$?
 { [ $rc -eq 0 ] && echo "$out" | grep -q 'already at'; } && ok "rerun is a no-op" || bad "rerun: rc=$rc $out"
@@ -73,6 +89,35 @@ echo "$PIN" >"$W3/dev/test_bars.pin"
 out=$(run "$W3" TRADING_RESULTS_DIR="$SRC"); rc=$?
 { [ $rc -eq 0 ] && ! echo "$out" | grep -q 'already at' && [ "$(cat "$W3/trading/test_data/.bars-pin")" = "$PIN" ]; } &&
   ok "rerun after pin appears marks it" || bad "post-pin rerun: rc=$rc $out"
+
+# md5 manifest: a wrong sum and a missing manifest both exit 1 and leave no marker.
+W4="$T/w4"; mk_tree "$W4" "$PIN_BAD"
+out=$(run "$W4" TRADING_RESULTS_DIR="$SRC"); rc=$?
+{ [ $rc -eq 1 ] && echo "$out" | grep -q 'md5 mismatch: A/L/AAPL/data.csv' && [ ! -f "$W4/trading/test_data/.bars-pin" ]; } &&
+  ok "md5 mismatch exits 1" || bad "md5 mismatch: rc=$rc $out"
+W5="$T/w5"; mk_tree "$W5" "$PIN_NOMAN"
+out=$(run "$W5" TRADING_RESULTS_DIR="$SRC"); rc=$?
+{ [ $rc -eq 1 ] && echo "$out" | grep -q 'no test-bars.md5' && [ ! -f "$W5/trading/test_data/.bars-pin" ]; } &&
+  ok "missing manifest at the pin exits 1" || bad "missing manifest: rc=$rc $out"
+
+# Manifest names a file absent after extraction: exit 1, `missing:` line, no marker.
+W6="$T/w6"; mk_tree "$W6" "$PIN_GHOST"
+out=$(run "$W6" TRADING_RESULTS_DIR="$SRC"); rc=$?
+{ [ $rc -eq 1 ] && echo "$out" | grep -q 'missing: Z/Z/GHOST/data.csv' && [ ! -f "$W6/trading/test_data/.bars-pin" ]; } &&
+  ok "manifest file absent after extraction exits 1" || bad "absent file: rc=$rc $out"
+
+# Fallback source (pin not in the checkout) with no manifest: WARN, bars copied, no marker.
+SRC2="$T/results2"
+mkdir -p "$SRC2/trading/test_data/A/L/AAPL"
+cp "$SRC_TD/A/L/AAPL/data.csv" "$SRC2/trading/test_data/A/L/AAPL/data.csv"
+git init -q "$SRC2"
+git -C "$SRC2" add -A
+git -C "$SRC2" -c user.name=t -c user.email=t@t commit -q -m bars
+W7="$T/w7"; mk_tree "$W7" "$MISSING"
+out=$(run "$W7" TRADING_RESULTS_DIR="$SRC2"); rc=$?
+{ [ $rc -eq 0 ] && echo "$out" | grep -q 'WARN: no test-bars.md5' && [ -f "$W7/trading/test_data/A/L/AAPL/data.csv" ] &&
+  [ ! -f "$W7/trading/test_data/.bars-pin" ]; } &&
+  ok "fallback without manifest warns, copies, no marker" || bad "fallback no manifest: rc=$rc $out"
 
 [ "$fails" -eq 0 ] || { echo "FAIL: fetch_test_bars_test: $fails case(s)"; exit 1; }
 echo "OK: fetch_test_bars_test"

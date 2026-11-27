@@ -1,11 +1,20 @@
 # Status: data-foundations
 
-## Last updated: 2026-11-25
+## Last updated: 2026-11-26
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-11-26 — split-corpus bars private + md5-checked bar fetch (#3676, after #3701).**
+  The 10 EODHD `trading/test_data/split_corpus/<case>/bars.csv` moved to
+  dayfine/trading-results (commit 7594576, now `dev/test_bars.pin`) with
+  `trading/test_data/test-bars.md5` (1,295 bar files). `fetch_test_bars.sh`
+  checks every md5 after extraction; `no_tracked_bars_check.sh` also fails on
+  a tracked split-corpus `bars.csv`; workflows prefer a read-only
+  `TRADING_RESULTS_READ_TOKEN` secret over `BOT_GITHUB_TOKEN`. Verify:
+  `sh trading/devtools/checks/fetch_test_bars_test.sh` and
+  `sh trading/devtools/checks/no_tracked_bars_check_test.sh`.
 - [x] **2026-11-25 — pit-v13 rename-twin repair + cross-vintage twin check (#3721 D1, #3713).**
   `dev/experiments/v13-twin-repair-2026-11-25/repair.sh` re-applies the
   pit-v12 drops whose legs were both back in a same-year v13 list (918 rows)
