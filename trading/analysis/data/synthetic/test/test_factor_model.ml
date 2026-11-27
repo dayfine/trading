@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Synthetic
 
 (* ------------------------------------------------------------------ *)

@@ -13,6 +13,7 @@
   core_unix
   ounit2
   matchers
+  status_matchers
   status)
  (deps
   (glob_files ./data/*.html)

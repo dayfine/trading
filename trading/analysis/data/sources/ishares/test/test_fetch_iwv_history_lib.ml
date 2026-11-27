@@ -2,6 +2,7 @@ open Core
 open Async
 open OUnit2
 open Matchers
+open Status_matchers
 module Lib = Fetch_iwv_history_lib
 
 let _date y m d = Date.create_exn ~y ~m ~d

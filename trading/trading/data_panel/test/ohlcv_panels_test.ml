@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Symbol_index = Data_panel.Symbol_index
 module Ohlcv_panels = Data_panel.Ohlcv_panels
 module BA2 = Bigarray.Array2

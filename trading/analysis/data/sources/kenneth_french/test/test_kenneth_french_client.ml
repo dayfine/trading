@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Kenneth_french.Kenneth_french_client
 
 (* The pinned sample fixture mirrors the source-CSV's two-block structure:

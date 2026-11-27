@@ -20,6 +20,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 
 (** Parse with [--csv-mode] prepended. Use in tests that pin flag-parsing
     behaviour orthogonal to snapshot mode — the explicit opt-out keeps the parse

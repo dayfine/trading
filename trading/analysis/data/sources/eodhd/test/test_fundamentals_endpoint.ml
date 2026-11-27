@@ -2,6 +2,7 @@ open Core
 open Async
 open OUnit2
 open Matchers
+open Status_matchers
 open Eodhd
 
 (* Driver: synchronous wrapper around the async endpoint, with an injectable

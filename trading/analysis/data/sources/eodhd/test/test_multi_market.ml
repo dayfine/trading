@@ -16,6 +16,7 @@ open Core
 open Async
 open OUnit2
 open Matchers
+open Status_matchers
 open Eodhd
 
 let _make_stub ~expected_symbol_suffix =

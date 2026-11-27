@@ -24,6 +24,7 @@
   core_unix.filename_unix
   ounit2
   matchers
+  status_matchers
   status
   types
   trading.base

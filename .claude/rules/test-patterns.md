@@ -1,5 +1,5 @@
 ---
-description: Test patterns using the Matchers library (base/matchers/)
+description: Test patterns using the Matchers library (dayfine/matchers, pinned by .devcontainer/pin_matchers.sh)
 paths:
   - "**/test/*.ml"
 harness: project
@@ -36,10 +36,11 @@ assert_that portfolio
   ])
 ```
 
-## Use the Matchers Library (`base/matchers/`)
+## Use the Matchers Library (external `dayfine/matchers` repo)
 
 ```ocaml
 open Matchers
+open Status_matchers (* only for Status.status_or: is_ok, is_error, is_error_with *)
 
 (* Assert on Result types with fluent matchers *)
 assert_that result (is_ok_and_holds (float_equal expected))

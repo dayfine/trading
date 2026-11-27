@@ -27,6 +27,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -43,6 +44,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -60,6 +62,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -75,7 +78,8 @@
   trading.engine
   trading.orders
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_sim_entry_stoplimit_fresh_bar)
@@ -91,6 +95,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -107,6 +112,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -124,6 +130,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -142,17 +149,33 @@
   backtest_cost_model
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
  (name test_time_series)
  (modules test_time_series)
- (libraries ounit2 core trading.simulation.data types matchers))
+ (libraries
+  ounit2
+  core
+  trading.simulation.data
+  types
+  matchers
+  status_matchers))
 
 (test
  (name test_price_cache)
  (modules test_price_cache)
- (libraries ounit2 core trading.simulation.data types matchers bos csv fpath))
+ (libraries
+  ounit2
+  core
+  trading.simulation.data
+  types
+  matchers
+  status_matchers
+  bos
+  csv
+  fpath))
 
 (test
  (name test_indicator_computer)
@@ -163,6 +186,7 @@
   trading.simulation.data
   types
   matchers
+  status_matchers
   indicators.types))
 
 (test
@@ -174,12 +198,22 @@
   trading.simulation.data
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
  (name test_market_data_adapter)
  (modules test_market_data_adapter)
- (libraries ounit2 core trading.simulation.data types matchers bos csv fpath))
+ (libraries
+  ounit2
+  core
+  trading.simulation.data
+  types
+  matchers
+  status_matchers
+  bos
+  csv
+  fpath))
 
 (test
  (name test_order_generator)
@@ -191,7 +225,8 @@
   trading.orders
   trading.base
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_e2e_integration)
@@ -207,6 +242,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -226,6 +262,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -239,7 +276,8 @@
   trading.simulation.types
   trading.engine
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_cash_yield_sim)
@@ -257,6 +295,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -277,6 +316,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -290,7 +330,8 @@
   trading.base
   trading.engine
   trading.portfolio
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_weinstein_backtest)
@@ -311,7 +352,8 @@
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
   ounit2
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_split_day_mtm)
@@ -329,6 +371,7 @@
   csv.split_dividend_guard
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -345,6 +388,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -361,6 +405,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -380,6 +425,7 @@
   weinstein.stage
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -395,7 +441,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_return_basics_computer)
@@ -409,7 +456,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_risk_adjusted_computer)
@@ -423,7 +471,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_drawdown_analytics_computer)
@@ -437,7 +486,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_capital_relative_drawdown_computer)
@@ -451,7 +501,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_distributional_computer)
@@ -465,7 +516,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_antifragility_computer)
@@ -479,7 +531,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_portfolio_summary)
@@ -492,7 +545,8 @@
   trading.simulation.types
   trading.base
   trading.portfolio
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_stale_hold)
@@ -510,7 +564,8 @@
   trading.engine
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_stability_turnover_computer)
@@ -525,7 +580,8 @@
   trading.portfolio
   trading.strategy
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_margin_runner)
@@ -541,6 +597,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -553,7 +610,8 @@
   trading.base
   trading.portfolio
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_short_buyin)
@@ -565,7 +623,8 @@
   trading.base
   trading.portfolio
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_cancel_handler)
@@ -580,7 +639,8 @@
   trading.portfolio
   trading.orders
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_entry_fill_retry)
@@ -593,7 +653,8 @@
   trading.base
   trading.orders
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_entry_fill_retry_e2e)
@@ -608,6 +669,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -622,7 +684,8 @@
   trading.orders
   trading.portfolio
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_portfolio_valuation)
@@ -637,7 +700,8 @@
   trading.base
   trading.portfolio
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_next_open_fill_gate)
@@ -652,7 +716,8 @@
   trading.engine
   trading.orders
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_fill_routing)
@@ -665,7 +730,8 @@
   trading.simulation
   trading.base
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_delisted_exit_runner)
@@ -682,7 +748,8 @@
   trading.engine
   trading.portfolio
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_delisted_ticket_cancel)
@@ -696,7 +763,8 @@
   trading.base
   trading.orders
   trading.strategy
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_delisted_ticket_cancel_sim)
@@ -712,6 +780,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -730,7 +799,8 @@
   csv.corporate_actions
   csv.split_dividend_guard
   types
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_entry_cash_rejection)
@@ -747,6 +817,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   status
   simulation_test_helpers))
 
@@ -763,7 +834,8 @@
   trading.portfolio
   trading.strategy
   status
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_sim_stop_beats_margin)
@@ -780,6 +852,7 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))
 
 (test
@@ -793,7 +866,8 @@
   trading.base
   trading.orders
   trading.portfolio
-  matchers))
+  matchers
+  status_matchers))
 
 (test
  (name test_simulator_checkpoint)
@@ -814,4 +888,5 @@
   trading.strategy
   types
   matchers
+  status_matchers
   simulation_test_helpers))

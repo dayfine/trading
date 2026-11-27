@@ -2,6 +2,7 @@ open OUnit2
 open Core
 open Trading_strategy.Position
 open Matchers
+open Status_matchers
 
 let date_of_string s = Date.of_string s
 

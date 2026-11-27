@@ -8,6 +8,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Universe_schedule = Scenario_lib.Universe_schedule
 
 let _ymd y m d = Date.create_exn ~y ~m:(Month.of_int_exn m) ~d

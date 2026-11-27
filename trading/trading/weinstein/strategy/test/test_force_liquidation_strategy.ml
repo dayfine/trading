@@ -20,6 +20,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Weinstein_strategy
 open Weinstein_types
 module FL = Portfolio_risk.Force_liquidation

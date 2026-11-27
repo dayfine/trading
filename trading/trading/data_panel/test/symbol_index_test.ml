@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Symbol_index = Data_panel.Symbol_index
 
 let _make_idx universe =

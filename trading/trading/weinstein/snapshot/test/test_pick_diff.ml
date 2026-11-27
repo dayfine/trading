@@ -3,6 +3,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Weinstein_snapshot
 
 (* ------- Fixtures ------- *)

@@ -7,6 +7,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module R = Walk_forward.Effect_null_report
 module Render = Walk_forward.Effect_null_render
 

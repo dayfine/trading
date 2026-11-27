@@ -9,6 +9,7 @@ open Core
 open Async
 open OUnit2
 open Matchers
+open Status_matchers
 open Eodhd.Http_client
 
 let _symbol_with ~code ~asset_type : symbol_metadata matcher =

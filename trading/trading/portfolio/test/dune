@@ -1,20 +1,26 @@
 (test
  (name test_portfolio)
- (libraries ounit2 trading.portfolio trading.orders trading.base matchers))
+ (libraries
+  ounit2
+  trading.portfolio
+  trading.orders
+  trading.base
+  matchers
+  status_matchers))
 
 (test
  (name test_calculations)
- (libraries ounit2 trading.portfolio trading.base matchers))
+ (libraries ounit2 trading.portfolio trading.base matchers status_matchers))
 
 (test
  (name test_split_event)
- (libraries ounit2 trading.portfolio trading.base matchers)
+ (libraries ounit2 trading.portfolio trading.base matchers status_matchers)
  (preprocess
   (pps ppx_test_matcher)))
 
 (test
  (name test_short_margin_tiers)
- (libraries core ounit2 trading.portfolio matchers))
+ (libraries core ounit2 trading.portfolio matchers status_matchers))
 
 (test
  (name test_margin_accounting)
@@ -25,4 +31,5 @@
   trading.portfolio
   trading.base
   status
-  matchers))
+  matchers
+  status_matchers))

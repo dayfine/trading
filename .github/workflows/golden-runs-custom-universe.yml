@@ -75,17 +75,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pin dayfine/matchers before the published image carries it (see ci.yml).
+      - name: Pin dayfine/matchers packages
+        working-directory: ${{ github.workspace }}
+        run: |
+          eval "$(opam env)"
+          sh .devcontainer/pin_matchers.sh
+
       - name: Fetch EODHD bar fixtures (private trading-results, #3676)
         working-directory: ${{ github.workspace }}
         env:
-          TRADING_RESULTS_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          TRADING_RESULTS_TOKEN: ${{ secrets.TRADING_RESULTS_READ_TOKEN || secrets.BOT_GITHUB_TOKEN }}
         run: sh dev/scripts/fetch_test_bars.sh
 
       - name: Cache _build
         uses: actions/cache@v4
         with:
           path: trading/_build
-          key: dune-${{ runner.os }}-${{ hashFiles('trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
+          key: dune-${{ runner.os }}-${{ hashFiles('.devcontainer/pin_matchers.sh', 'trading/**/*.opam', 'trading/**/dune', 'trading/**/*.ml', 'trading/**/*.mli') }}
 
       - name: Run custom-universe golden postsubmit
         id: golden_custom_universe

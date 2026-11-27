@@ -6,6 +6,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Fuzz_spec = Backtest.Fuzz_spec
 
 (* ---- date specs ---- *)

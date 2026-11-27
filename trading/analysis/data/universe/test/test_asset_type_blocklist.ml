@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module ATB = Universe.Asset_type_blocklist
 
 (* ---------------------------------------------------------------------- *)

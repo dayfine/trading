@@ -12,6 +12,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Universe_snapshot = Scenario_lib.Universe_snapshot
 module Snapshot = Universe.Snapshot
 

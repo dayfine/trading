@@ -13,6 +13,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Cancel_handler = Trading_simulation.Cancel_handler
 module Entry_fill_retry = Trading_simulation.Entry_fill_retry
 module Position = Trading_strategy.Position

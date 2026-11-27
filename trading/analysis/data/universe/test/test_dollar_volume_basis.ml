@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Universe
 module DVB = Dollar_volume_basis
 module BR = Composition_bar_reader

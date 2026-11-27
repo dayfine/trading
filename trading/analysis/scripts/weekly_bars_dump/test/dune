@@ -6,6 +6,7 @@
   core_unix.filename_unix
   fpath
   matchers
+  status_matchers
   ounit2
   status
   types

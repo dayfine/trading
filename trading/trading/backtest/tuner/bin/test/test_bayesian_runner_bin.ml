@@ -20,6 +20,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Spec = Tuner_bin.Bayesian_runner_spec
 module Runner = Tuner_bin.Bayesian_runner_runner
 module Evaluator = Tuner_bin.Bayesian_runner_evaluator

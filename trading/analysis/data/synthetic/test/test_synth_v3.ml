@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Synthetic
 
 let _default_cfg ?(n_symbols = 5) ?(target = 200) ?(seed = 17) () =

@@ -20,6 +20,7 @@
   csv
   fpath
   matchers
+  status_matchers
   status
   trading.data_panel
   trading.strategy

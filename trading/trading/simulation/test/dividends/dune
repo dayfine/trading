@@ -12,6 +12,7 @@
   trading.base
   trading.portfolio
   trading.simulation.dividends
-  matchers)
+  matchers
+  status_matchers)
  (preprocess
   (pps ppx_let)))

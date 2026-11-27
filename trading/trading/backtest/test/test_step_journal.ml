@@ -4,6 +4,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module SJ = Backtest.Step_journal
 
 let _step n : SJ.step_result =

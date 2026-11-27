@@ -2,6 +2,7 @@ open Core
 open OUnit2
 open Trading_simulation_data
 open Matchers
+open Status_matchers
 
 (** Test helper: create a daily price *)
 let make_price ~y ~m ~d ~close () =

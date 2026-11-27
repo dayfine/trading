@@ -19,6 +19,7 @@
 #
 # Rebuilt when:
 #   * .devcontainer/Dockerfile changes (new system / opam dep)
+#   * .devcontainer/pin_matchers.sh changes (dayfine/matchers commit bump)
 #   * any *.opam file changes (dependency graph changed)
 #   * weekly cron (pick up upstream base-image security patches)
 #   * manually via workflow_dispatch
@@ -29,6 +30,7 @@ on:
     branches: [main]
     paths:
       - '.devcontainer/Dockerfile'
+      - '.devcontainer/pin_matchers.sh'
       - 'trading/**/*.opam'
       - '.github/workflows/image.yml'
   schedule:

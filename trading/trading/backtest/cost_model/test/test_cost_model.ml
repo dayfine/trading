@@ -8,6 +8,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module CM = Backtest_cost_model.Cost_model
 
 (* ------------------------------------------------------------------ *)

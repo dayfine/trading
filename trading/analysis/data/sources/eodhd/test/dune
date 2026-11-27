@@ -8,6 +8,15 @@
   test_exchange_resolver
   test_multi_market
   test_asset_type)
- (libraries eodhd core async async_unix ounit2 csv matchers status)
+ (libraries
+  eodhd
+  core
+  async
+  async_unix
+  ounit2
+  csv
+  matchers
+  status_matchers
+  status)
  (deps
   (glob_files ./data/*.json)))

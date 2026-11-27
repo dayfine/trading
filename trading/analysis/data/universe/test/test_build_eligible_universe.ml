@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Universe
 open Universe.Snapshot
 module BEU = Build_eligible_universe

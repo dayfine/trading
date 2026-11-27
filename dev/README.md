@@ -5,18 +5,23 @@ building the Weinstein Trading System.
 
 ## EODHD bar fixtures (private, fetched)
 
-The 650 `trading/test_data/<A-Z>/**/data.csv` bar files (+ `data.metadata.sexp`) are not tracked here (EODHD terms,
-#3676); they live in the private repo `dayfine/trading-results` at the same paths, pinned by `dev/test_bars.pin`.
-`trading/devtools/checks/no_tracked_bars_check.sh` fails CI if one is tracked again.
+The 650 `trading/test_data/<A-Z>/**/data.csv` bar files (+ `data.metadata.sexp`) and the 10
+`trading/test_data/split_corpus/<case>/bars.csv` are not tracked here (EODHD terms, #3676); they live in the private
+repo `dayfine/trading-results` at the same paths, pinned by `dev/test_bars.pin`, with `trading/test_data/test-bars.md5`
+(the md5 of every bar file) beside them. The fetch script checks every md5 after extraction and fails on a mismatch.
+`trading/devtools/checks/no_tracked_bars_check.sh` fails CI if a bar file is tracked again.
 
 - **Local**: keep a sibling checkout at `~/Projects/trading-results` (`git clone git@github.com:dayfine/trading-results.git`),
   then run `sh dev/scripts/fetch_test_bars.sh` in each checkout or worktree before `dune runtest` or a backtest. It
   extracts the pinned commit (`git -C ~/Projects/trading-results pull` if the pin is missing); set `TRADING_RESULTS_DIR`
   for another location. The docker dev container sees the files because they sit under the checkout.
 - **Cloud sessions**: clone trading-results next to the repo, then `TRADING_RESULTS_DIR=<clone> sh dev/scripts/fetch_test_bars.sh`.
-- **CI**: every workflow that reads the bars runs the same script with `TRADING_RESULTS_TOKEN` set from the
-  `BOT_GITHUB_TOKEN` secret. Fork PRs get no secrets, so the step fails with a message instead of skipping tests.
-- **Bump the pin** (new or refreshed bars): commit them to trading-results, then put that commit in `dev/test_bars.pin`.
+- **CI**: every workflow that reads the bars runs the same script with `TRADING_RESULTS_TOKEN` set from the read-only
+  `TRADING_RESULTS_READ_TOKEN` secret (a fine-grained token with Contents: read on trading-results only), falling back
+  to `BOT_GITHUB_TOKEN` while that secret is unset. Fork PRs get no secrets, so the step fails with a message instead
+  of skipping tests.
+- **Bump the pin** (new or refreshed bars): commit them to trading-results with a regenerated `test-bars.md5` (command in
+  its README), then put that commit in `dev/test_bars.pin`.
 
 ## Where agents run
 

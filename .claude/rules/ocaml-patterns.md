@@ -16,7 +16,7 @@ harness: project
 
 - Result types for validation: `type validation_result = (order_params, validation_error list) result`
 - Custom error types per domain area
-- Status module in `base/status/` for common result patterns
+- `status` package (dayfine/matchers repo, pinned by `.devcontainer/pin_matchers.sh`) for common result patterns
 
 ## Validation Patterns
 

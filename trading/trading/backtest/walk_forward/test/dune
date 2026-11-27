@@ -17,6 +17,7 @@
   core_unix
   core_unix.filename_unix
   matchers
+  status_matchers
   backtest
   backtest_cost_model
   fork_pool

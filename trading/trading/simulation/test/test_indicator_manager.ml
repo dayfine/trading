@@ -2,6 +2,7 @@ open OUnit2
 open Core
 open Trading_simulation_data
 open Matchers
+open Status_matchers
 open Test_helpers
 
 (** Generate daily prices for a date range with incrementing closes *)

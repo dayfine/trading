@@ -1,6 +1,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot = Data_panel_snapshot.Snapshot
 module Snapshot_format = Data_panel_snapshot.Snapshot_format

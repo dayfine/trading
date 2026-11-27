@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module RL = Apply_composition_policy_runner_lib
 module CPT = Universe.Composition_policy_types
 module Snapshot = Universe.Snapshot

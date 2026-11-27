@@ -15,8 +15,8 @@ The `dayfine/trading` repo is a **solid foundation** to build on. It has ~18,600
 | Module | What it does | Lines | Tests | Maturity |
 |--------|-------------|-------|-------|----------|
 | `base/types` | Symbol, price, quantity, side, order_type, trade | ~100 | Yes | Solid |
-| `base/status` | Result types, error handling, combinators | ~200 | Yes | Solid |
-| `base/matchers` | Test assertion library | ~300 | Yes | Solid |
+| `status` (dayfine/matchers repo) | Result types, error handling, combinators | ~200 | Yes | Solid |
+| `matchers` (dayfine/matchers repo) | Test assertion library | ~300 | Yes | Solid |
 | `orders/` | Order creation, validation, lifecycle, CRUD | ~1600 | 3 test files | Solid |
 | `portfolio/` | Position tracking, cash, P&L, trade application | ~2000 | 2 test files | Solid |
 | `engine/` | Simulated broker, OHLC price path, order execution | ~2000 | 3 test files | Solid |
@@ -214,7 +214,7 @@ analysis/weinstein/reporter/
 - Daily→weekly conversion → `indicators/time_period/` ✓
 - EMA calculation → `indicators/ema/` ✓
 - Trend regression → `technical/trend/` ✓
-- Test matchers → `base/matchers/` ✓
+- Test matchers → the external `dayfine/matchers` repo ✓
 
 ---
 

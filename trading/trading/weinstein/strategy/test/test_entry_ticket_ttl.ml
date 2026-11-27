@@ -22,6 +22,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 open Weinstein_strategy
 module Position = Trading_strategy.Position
 module FL = Portfolio_risk.Force_liquidation

@@ -3,6 +3,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 
 let run_deferred d = Async.Thread_safe.block_on_async_exn (fun () -> d)
 let start_date = Date.of_string "2024-01-02"

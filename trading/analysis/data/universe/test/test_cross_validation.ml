@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 module CV = Universe.Cross_validation
 module Snapshot = Universe.Snapshot
 module SC = Shiller.Shiller_client

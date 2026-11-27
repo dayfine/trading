@@ -19,6 +19,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Panel_callbacks = Weinstein_strategy.Panel_callbacks
 module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest

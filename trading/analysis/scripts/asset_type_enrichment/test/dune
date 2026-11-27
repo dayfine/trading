@@ -7,6 +7,7 @@
   core_unix.sys_unix
   ounit2
   matchers
+  status_matchers
   status
   eodhd
   asset_type_enrichment_lib)

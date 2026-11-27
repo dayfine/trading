@@ -41,6 +41,7 @@
 open OUnit2
 open Core
 open Matchers
+open Status_matchers
 module Scoring = Tuner_bin.Bayesian_runner_scoring
 module Wf = Walk_forward.Walk_forward_types
 module FG = Walk_forward.Fold_gate

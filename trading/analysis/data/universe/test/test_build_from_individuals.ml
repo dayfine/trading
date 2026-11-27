@@ -1,6 +1,7 @@
 open Core
 open OUnit2
 open Matchers
+open Status_matchers
 open Universe
 open Universe.Snapshot
 module BFI = Build_from_individuals

@@ -8,5 +8,6 @@
   trading.base
   trading.portfolio
   trading.simulation.cash_yield
-  matchers)
+  matchers
+  status_matchers)
  (deps dtb3_fixture.csv))

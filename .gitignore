@@ -198,3 +198,7 @@ dev/experiments/bayesian-production-sweep-2026-05-18/output-v3-parallel4/*
 
 # Marker written by dev/scripts/fetch_test_bars.sh (#3676)
 trading/test_data/.bars-pin
+# Fetched from trading-results by the same script (#3676): split-corpus bars and
+# the md5 manifest of every bar file. split_corpus/<case>/meta.sexp stays tracked.
+trading/test_data/split_corpus/*/bars.csv
+trading/test_data/test-bars.md5
