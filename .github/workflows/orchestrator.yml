@@ -221,28 +221,18 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           github_token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          show_full_output: true
           # show_full_output omitted (default false). Tool-call traces are
           # dumped to the GHA log at ~2-3 MB per run and duplicate content
           # that already lands in the merged daily-summary PR. We read the
           # summary instead; full logs are only needed when debugging the
           # workflow infra itself (container setup, checkout, etc.).
           prompt: |
-            Run the daily orchestrator session. Today is ${{ steps.today.outputs.date }}.
-            Read .claude/agents/lead-orchestrator.md and follow it end to end.
-
-            Computed fact (not your own read -- the workflow queried this via
-            the GitHub API before you started): QUEUE_NON_EMPTY=${{ steps.fastexit-precheck.outputs.open_pr_count }}
-            open PRs exist right now. Per Step 0.5's "Precondition -- the
-            queue must be non-empty", if this number is 0 you MUST skip the
-            saturated-queue fast-exit check entirely and proceed straight to
-            Step 2 (a full pass) -- do not evaluate the four fast-exit
-            conditions. This fact is also verified mechanically after your
-            run finishes (dev/scripts/orchestrator_fastexit_gate.sh verify);
-            a NO-OP summary that contradicts it fails the whole job (#2579).
+            Reply with the single word OK. Do nothing else.
           claude_args: |
             --agent lead-orchestrator
             --allowedTools Agent,Bash,Read,Write,Edit,Glob,Grep
-            --max-turns 200
+            --max-turns 1
 
       - name: Capture run cost from execution file
         # Fallback branch 1b: claude-code-action@v1 exposes an execution_file
